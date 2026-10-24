@@ -1,0 +1,253 @@
+import { useMemo, useState } from "react";
+import { Check, CircleHelp, ListChecks, RotateCcw, Sparkles } from "lucide-react";
+import CardImage from "../components/CardImage";
+import RunningStyleLogo from "../components/RunningStyleLogo";
+import { findMatchingScenario, getScenarioRecommendations, LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, RUNNING_STYLES } from "../lib/scenarioEngine";
+
+const CORE_ORDER = ["kitasan-black", "super-creek", "fine-motion", "agnes-tachyon", "maruzensky", "mr-cb"];
+
+// Replace this ID with your own YouTube video ID when your video is ready.
+const FEATURED_VIDEO_ID = "kBsB3_luYHk";
+const FEATURED_VIDEO_START_SECONDS = 10;
+
+function sortCoreCards(cards) {
+  const order = new Map(CORE_ORDER.map((id, index) => [id, index]));
+  return [...cards].sort((a, b) => (order.get(a.id) ?? 100) - (order.get(b.id) ?? 100));
+}
+
+function RecommendationPanel({ category, items, cardMap }) {
+  return (
+    <section className="result-category" key={category.id}>
+      <div className="result-category-heading">
+        <div className="result-category-symbol">{category.id === "universal" ? <Sparkles size={18} /> : <RunningStyleLogo styleId={category.id} className="result-category-style-logo" />}</div>
+        <div>
+          <h3>{category.label}</h3>
+          <p>{category.description}</p>
+        </div>
+      </div>
+      {items.length === 0 ? (
+        <div className="category-unconfigured">
+          <CircleHelp size={16} />
+          <span>The creator has not added recommendations for this category yet.</span>
+        </div>
+      ) : (
+        <div className="recommendation-cards">
+          {items.map((item, index) => {
+            const card = cardMap.get(String(item.cardId));
+            if (!card) return null;
+            const status = item.status === "alternative" ? "alternative" : "recommended";
+            return (
+              <article className={`recommendation-card recommendation-${status}`} key={`${category.id}-${item.cardId}-${index}`}>
+                <CardImage card={card} className="recommendation-card-image" />
+                <div className="recommendation-card-detail">
+                  <span className={`recommendation-status ${status}`}>{status === "recommended" ? "Recommended" : "Alternative"}</span>
+                  <h4>{card.name}</h4>
+                  <p>{card.type || "Support Card"}</p>
+                  {item.note && <p className="recommendation-note">{item.note}</p>}
+                </div>
+                <span className="recommendation-number">{String(index + 1).padStart(2, "0")}</span>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function SelectorPage({ config, loading }) {
+  const [selectedStyles, setSelectedStyles] = useState([]);
+  const [levels, setLevels] = useState({});
+  const cards = Array.isArray(config?.cards) ? config.cards : [];
+  const coreCards = useMemo(() => sortCoreCards(cards.filter((card) => card.isCore)), [cards]);
+  const cardMap = useMemo(() => new Map(cards.map((card) => [String(card.id), card])), [cards]);
+  const allCoreFilled = coreCards.length > 0 && coreCards.every((card) => levels[card.id] !== undefined && levels[card.id] !== null);
+  const matchedScenario = useMemo(() => (allCoreFilled ? findMatchingScenario(config?.scenarios, levels, coreCards) : null), [allCoreFilled, config?.scenarios, levels, coreCards]);
+
+  const categoriesToShow = useMemo(() => [RECOMMENDATION_CATEGORIES[0], ...RECOMMENDATION_CATEGORIES.slice(1).filter((category) => selectedStyles.includes(category.id))], [selectedStyles]);
+
+  function toggleStyle(styleId) {
+    setSelectedStyles((current) => (current.includes(styleId) ? current.filter((item) => item !== styleId) : [...current, styleId]));
+  }
+
+  function changeLevel(cardId, rawValue) {
+    setLevels((current) => {
+      const next = { ...current };
+      if (rawValue === "") delete next[cardId];
+      else next[cardId] = Number(rawValue);
+      return next;
+    });
+  }
+
+  function resetViewer() {
+    setLevels({});
+    setSelectedStyles([]);
+  }
+
+  return (
+    <main className="page-shell">
+      <section className="hero hero-selector">
+        <div className="hero-copy">
+          <span className="eyebrow">UMA MUSUME · SUPPORT CARD TOOL</span>
+          <h1>
+            2nd Anniversary
+            <br />
+            <span>Selector Guide.</span>
+          </h1>
+          <p>In the end, it all comes down to your own decision. Always use this tools as a reference</p>
+        </div>
+        <div className="hero-video-column">
+          <div className="hero-video-heading">
+            <span className="section-kicker">FEATURED VIDEO</span>
+            <span className="hero-video-caption">SELECTOR GUIDE</span>
+          </div>
+          <div className="hero-video-frame">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${FEATURED_VIDEO_ID}?start=${FEATURED_VIDEO_START_SECONDS}&rel=0`}
+              title="Uma Musume support card exchange guide"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+          <p className="hero-video-footnote">Watch the guide, then build your exchange plan below.</p>
+        </div>
+      </section>
+
+      <section className="intro-row">
+        <div>
+          <span className="section-kicker">01 / RUNNING STYLE</span>
+          <h2>What do you play?</h2>
+        </div>
+        <p>Select one or more styles to show relevant recommendation categories. Universal is always included.</p>
+      </section>
+      <section className="style-grid" aria-label="Choose running styles">
+        {RUNNING_STYLES.map((style, index) => {
+          const active = selectedStyles.includes(style.id);
+          return (
+            <button key={style.id} type="button" className={`style-option style-${style.id} ${active ? "active" : ""}`} onClick={() => toggleStyle(style.id)} aria-pressed={active}>
+              <span className="style-index">
+                <span>0{index + 1}</span>
+                <RunningStyleLogo styleId={style.id} className="style-option-logo" />
+              </span>
+              <span className="style-label">{style.label}</span>
+              <span className="style-check">{active ? <Check size={16} /> : <span />}</span>
+            </button>
+          );
+        })}
+      </section>
+
+      <section className="intro-row collection-intro">
+        <div>
+          <span className="section-kicker">02 / CORE INVENTORY</span>
+          <h2>Your core support cards</h2>
+        </div>
+        <div className="collection-actions">
+          <span className={`counter-pill ${allCoreFilled ? "counter-complete" : ""}`}>
+            {Object.keys(levels).filter((id) => coreCards.some((card) => card.id === id)).length} / {coreCards.length} complete
+          </span>
+          <button type="button" className="reset-viewer-button" onClick={resetViewer} disabled={Object.keys(levels).length === 0 && selectedStyles.length === 0}>
+            <RotateCcw size={14} /> Reset all
+          </button>
+        </div>
+      </section>
+      <p className="section-description">
+        Choose a level for every card. Select <strong>Not owned</strong> if you do not own it. Do not leave a selection empty.
+      </p>
+
+      {loading ? (
+        <div className="empty-state">
+          <div className="loading-pulse" />
+          <strong>Loading cards</strong>
+          <p>Loading the latest card catalog and scenarios.</p>
+        </div>
+      ) : coreCards.length === 0 ? (
+        <div className="empty-state catalog-empty">
+          <div className="empty-icon">
+            <ListChecks size={24} />
+          </div>
+          <h3>Core cards unavailable</h3>
+          <p>The card catalog could not be loaded. Check the Supabase configuration.</p>
+        </div>
+      ) : (
+        <div className="core-card-grid">
+          {coreCards.map((card, index) => (
+            <article className={`core-card ${levels[card.id] !== undefined ? "is-filled" : ""}`} key={card.id}>
+              <div className="core-card-photo-wrap">
+                <CardImage card={card} className="core-card-photo" eager={index < 2} />
+                <span className="core-card-index">CORE 0{index + 1}</span>
+              </div>
+              <div className="core-card-content">
+                <span className="core-card-type">{card.type || "Support Card"}</span>
+                <h3>{card.name}</h3>
+                <label className="level-control core-level-control">
+                  <span>Limit break</span>
+                  <select value={levels[card.id] ?? ""} onChange={(event) => changeLevel(card.id, event.target.value)} aria-label={`Choose a level ${card.name}`} required>
+                    <option value="">Choose a level LB</option>
+                    {LEVEL_OPTIONS.map((level) => (
+                      <option key={level.value} value={level.value}>
+                        {level.value === -1 ? level.label : level.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {levels[card.id] !== undefined && (
+                <span className="core-filled-mark">
+                  <Check size={13} />
+                </span>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+
+      <section className="recommendation-section public-result-section" aria-live="polite">
+        <div className="recommendation-heading">
+          <div>
+            <span className="section-kicker">03 / EXCHANGE SUPOKA</span>
+            <h2>Your recommendations</h2>
+          </div>
+        </div>
+        {!allCoreFilled ? (
+          <div className="recommendation-empty">
+            <div className="recommendation-icon">
+              <ListChecks size={24} />
+            </div>
+            <div className="recommendation-copy">
+              <h3>Complete all six core cards first</h3>
+              <p>Your card levels are used to match scenarios created by the creator. Results appear after all six are selected.</p>
+            </div>
+          </div>
+        ) : !matchedScenario ? (
+          <div className="recommendation-empty">
+            <div className="recommendation-icon">
+              <CircleHelp size={24} />
+            </div>
+            <div className="recommendation-copy">
+              <h3>No recommendations available</h3>
+              <p>There are no recommendations configured for this combination of core-card levels yet.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="results-category-list">
+              {categoriesToShow.map((category) => (
+                <RecommendationPanel key={category.id} category={category} items={getScenarioRecommendations(matchedScenario, category.id)} cardMap={cardMap} />
+              ))}
+            </div>
+            {!selectedStyles.length && <p className="result-hint">Select running styles above to see style-specific recommendations. Universal remains available.</p>}
+          </>
+        )}
+      </section>
+
+      <footer className="site-footer">
+        <span>
+          SUPPORT CARD SELECTOR <span className="footer-dot">·</span> COMMUNITY TOOL
+        </span>
+        <span>NOT AFFILIATED WITH CYGAMES</span>
+      </footer>
+    </main>
+  );
+}
