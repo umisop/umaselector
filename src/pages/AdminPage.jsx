@@ -551,6 +551,7 @@ export default function AdminPage() {
           ) : (
             <>
               <span>{session.user.email}</span>
+              <a className="button-secondary button-compact" href="/admin/community">Community reports</a>
               <button className="button-secondary button-compact" onClick={handleLogout}>
                 <LogOut size={15} /> Sign out
               </button>

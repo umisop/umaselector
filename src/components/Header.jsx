@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Users } from "lucide-react";
 
 export default function Header() {
   return (
@@ -11,11 +11,12 @@ export default function Header() {
         </span>
       </a>
       <div className="site-header-actions">
-        <span className="header-note">
-          <span className="status-dot" /> TOOL FOR UMA MUSUME PLAYERS
-        </span>
+        <span className="header-note"></span>
+        <a className="header-community-link" href="/#community">
+          <Users size={14} /> Community
+        </a>
         <a className="header-admin-link" href="/admin">
-          <ShieldCheck size={14} /> Creator
+          <ShieldCheck size={14} /> Admin
         </a>
       </div>
     </header>

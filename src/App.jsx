@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import Header from "./components/Header";
 import SelectorPage from "./pages/SelectorPage";
 import AdminPage from "./pages/AdminPage";
+import CommunityModerationPage from "./pages/CommunityModerationPage";
+import ProfilePage from "./pages/ProfilePage";
+import SiteInfoPage, { SITE_INFO_PATHS } from "./pages/SiteInfoPage";
 import { getPublicConfig } from "./lib/catalog";
 import { isSupabaseConfigured } from "./lib/supabase";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
@@ -28,12 +31,17 @@ function AdminSetupRequired() {
 }
 
 export default function App() {
-  const isAdminRoute = window.location.pathname.startsWith("/admin");
+  const currentPath = window.location.pathname.replace(/\/$/, "") || "/";
+  const isProfileRoute = currentPath === "/profile";
+  const isCommunityModerationRoute = currentPath === "/admin/community";
+  const isAnyAdminRoute = window.location.pathname.startsWith("/admin");
+  const isSiteInfoRoute = SITE_INFO_PATHS.includes(currentPath);
+  const isAdminRoute = isAnyAdminRoute && !isCommunityModerationRoute;
   const [config, setConfig] = useState({ cards: [], scenarios: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isAdminRoute) return undefined;
+    if (isAnyAdminRoute || isSiteInfoRoute) return undefined;
     let active = true;
     getPublicConfig()
       .then((data) => {
@@ -46,7 +54,20 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [isAdminRoute]);
+  }, [isAnyAdminRoute, isSiteInfoRoute]);
+
+  if (isSiteInfoRoute) {
+    return <SiteInfoPage path={currentPath} />;
+  }
+
+  if (isProfileRoute) {
+    return <ProfilePage config={config} />;
+  }
+
+  if (isCommunityModerationRoute) {
+    if (import.meta.env.PROD && !isSupabaseConfigured) return <AdminSetupRequired />;
+    return <CommunityModerationPage />;
+  }
 
   if (isAdminRoute) {
     // Local browser preview is allowed only during development. In production, fail closed.

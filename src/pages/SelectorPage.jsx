@@ -1,7 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, CircleHelp, ListChecks, RotateCcw, Sparkles } from "lucide-react";
 import CardImage from "../components/CardImage";
 import RunningStyleLogo from "../components/RunningStyleLogo";
+import CommunitySection from "../components/CommunitySection";
+import Footer from "../components/Footer";
+import { readSitePreferences, subscribeSitePreferences } from "../lib/sitePreferences";
 import { findMatchingScenario, getScenarioRecommendations, LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, RUNNING_STYLES } from "../lib/scenarioEngine";
 
 const CORE_ORDER = ["kitasan-black", "super-creek", "fine-motion", "agnes-tachyon", "maruzensky", "mr-cb"];
@@ -57,6 +60,8 @@ function RecommendationPanel({ category, items, cardMap }) {
 
 export default function SelectorPage({ config, loading }) {
   const [selectedStyles, setSelectedStyles] = useState([]);
+  const [sitePreferences, setSitePreferences] = useState(() => readSitePreferences());
+  useEffect(() => subscribeSitePreferences(setSitePreferences), []);
   const [levels, setLevels] = useState({});
   const cards = Array.isArray(config?.cards) ? config.cards : [];
   const coreCards = useMemo(() => sortCoreCards(cards.filter((card) => card.isCore)), [cards]);
@@ -102,14 +107,22 @@ export default function SelectorPage({ config, loading }) {
             <span className="hero-video-caption">SELECTOR GUIDE</span>
           </div>
           <div className="hero-video-frame">
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${FEATURED_VIDEO_ID}?start=${FEATURED_VIDEO_START_SECONDS}&rel=0`}
-              title="Uma Musume support card exchange guide"
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
+            {sitePreferences.externalMedia ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${FEATURED_VIDEO_ID}?start=${FEATURED_VIDEO_START_SECONDS}&rel=0`}
+                title="Uma Musume support card exchange guide"
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            ) : (
+              <div className="hero-video-consent">
+                <span>EXTERNAL MEDIA IS DISABLED</span>
+                <p>Allow optional YouTube media to load the featured video.</p>
+                <a href="/cookie-settings">Open cookie settings</a>
+              </div>
+            )}
           </div>
           <p className="hero-video-footnote">Watch the guide, then build your exchange plan below.</p>
         </div>
@@ -207,7 +220,7 @@ export default function SelectorPage({ config, loading }) {
         <div className="recommendation-heading">
           <div>
             <span className="section-kicker">03 / EXCHANGE SUPOKA</span>
-            <h2>Your recommendations</h2>
+            <h2>My Recommendation</h2>
           </div>
         </div>
         {!allCoreFilled ? (
@@ -242,12 +255,9 @@ export default function SelectorPage({ config, loading }) {
         )}
       </section>
 
-      <footer className="site-footer">
-        <span>
-          SUPPORT CARD SELECTOR <span className="footer-dot">·</span> COMMUNITY TOOL
-        </span>
-        <span>NOT AFFILIATED WITH CYGAMES</span>
-      </footer>
+      <CommunitySection cards={cards} coreCards={coreCards} levels={levels} allCoreFilled={allCoreFilled} matchedScenario={matchedScenario} selectedStyles={selectedStyles} />
+
+      <Footer />
     </main>
   );
 }
