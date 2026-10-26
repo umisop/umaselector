@@ -11,7 +11,12 @@
       "rarity": "SSR",
       "gameCardId": "30028",
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30028.png",
-      "gameToraUrl": "https://gametora.com/umamusume/supports/30028-kitasan-black"
+      "gameToraUrl": "https://gametora.com/umamusume/supports/30028-kitasan-black",
+      "coreDescription": {
+        "style": "Universal",
+        "usableFrom": "LB3 recommended for strong performance",
+        "strengths": "Strong Speed support; LB3 is a key breakpoint."
+      }
     },
     {
       "id": "super-creek",
@@ -21,7 +26,12 @@
       "rarity": "SSR",
       "gameCardId": "30016",
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30016.png",
-      "gameToraUrl": "https://gametora.com/umamusume/supports/30016-super-creek"
+      "gameToraUrl": "https://gametora.com/umamusume/supports/30016-super-creek",
+      "coreDescription": {
+        "style": "Universal",
+        "usableFrom": "LB0 is usable",
+        "strengths": "Strong Stamina support; LB3 improves initial gauge."
+      }
     },
     {
       "id": "fine-motion",
@@ -31,7 +41,13 @@
       "rarity": "SSR",
       "gameCardId": "30010",
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30010.png",
-      "gameToraUrl": "https://gametora.com/umamusume/supports/30010-fine-motion"
+      "gameToraUrl": "https://gametora.com/umamusume/supports/30010-fine-motion",
+      "coreDescription": {
+        "style": "Universal",
+        "usableFrom": "LB1 is usable",
+        "strengths": "Excellent Wit stat gain; stronger at LB3 & LB4.",
+        "notes": "Reedem to Wit card is disadvantage, especially when your wit card is low LB or don't have, After Grand master, we only use 1 wit card"
+      }
     },
     {
       "id": "agnes-tachyon",
@@ -41,7 +57,12 @@
       "rarity": "SSR",
       "gameCardId": "30101",
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30101.png",
-      "gameToraUrl": "https://gametora.com/umamusume/supports/30101-agnes-tachyon"
+      "gameToraUrl": "https://gametora.com/umamusume/supports/30101-agnes-tachyon",
+      "coreDescription": {
+        "style": "Pace Chaser",
+        "usableFrom": "LB3 required",
+        "strengths": "Core Pace Chaser card; aim for LB3."
+      }
     },
     {
       "id": "maruzensky",
@@ -51,7 +72,13 @@
       "rarity": "SSR",
       "gameCardId": "30107",
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30107.png",
-      "gameToraUrl": "https://gametora.com/umamusume/supports/30107-maruzensky"
+      "gameToraUrl": "https://gametora.com/umamusume/supports/30107-maruzensky",
+      "coreDescription": {
+        "style": "Front Runner-Semi Universal",
+        "usableFrom": "LB1 is usable",
+        "strengths": "LB3 is Very Strong Card",
+        "notes": "In other style use only for Stat Gain"
+      }
     },
     {
       "id": "mr-cb",
@@ -61,7 +88,12 @@
       "rarity": "SSR",
       "gameCardId": "30097",
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30097.png",
-      "gameToraUrl": "https://gametora.com/umamusume/supports/30097-mr-cb"
+      "gameToraUrl": "https://gametora.com/umamusume/supports/30097-mr-cb",
+      "coreDescription": {
+        "style": "End Closer",
+        "usableFrom": "LB1 is usable",
+        "strengths": "Daring Strike for End Closer | LB3 is a strong"
+      }
     },
     {
       "id": "30001",

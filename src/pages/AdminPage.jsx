@@ -14,6 +14,7 @@ import {
   ImagePlus,
   LogIn,
   LogOut,
+  Layers,
   Plus,
   RotateCcw,
   Save,
@@ -29,7 +30,10 @@ import { getPublicConfig, saveConfig } from "../lib/catalog";
 import seedConfig from "../data/seed.json";
 import CardImage from "../components/CardImage";
 import RunningStyleLogo from "../components/RunningStyleLogo";
+import CombinationScenarioManager from "../components/CombinationScenarioManager";
+import RecommendationRuleManager from "../components/RecommendationRuleManager";
 import { findMatchingScenario, getScenarioRecommendations, makeEmptyConditions, makeEmptyRecommendations, RECOMMENDATION_CATEGORIES, RUNNING_STYLES, validateConfig } from "../lib/scenarioEngine";
+import { createEmptyRecommendationModel, normalizeRecommendationModel, buildRuleBasedRecommendations } from "../lib/recommendationRules";
 
 const CORE_ORDER = ["kitasan-black", "super-creek", "fine-motion", "agnes-tachyon", "maruzensky", "mr-cb"];
 const CORE_LABELS = {
@@ -83,6 +87,7 @@ function ensureConfig(value) {
     ...seedConfig,
     ...source,
     cards,
+    recommendationModel: normalizeRecommendationModel(source.recommendationModel || createEmptyRecommendationModel()),
     scenarios: Array.isArray(source.scenarios)
       ? source.scenarios.map((scenario) => ({
           ...scenario,
@@ -106,7 +111,7 @@ function summarizeCondition(scenario, coreCards) {
   return parts.length ? parts.join(" · ") : "All conditions ignored";
 }
 
-function AdminPage() {
+export default function AdminPage() {
   const localMode = !isSupabaseConfigured;
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState("");
@@ -118,6 +123,7 @@ function AdminPage() {
   const [success, setSuccess] = useState("");
   const [jsonError, setJsonError] = useState("");
   const [activeTab, setActiveTab] = useState("scenarios");
+  const [scenarioWorkspaceMode, setScenarioWorkspaceMode] = useState("rules");
   const [selectedScenarioId, setSelectedScenarioId] = useState(null);
   const [activeCategory, setActiveCategory] = useState("universal");
   const [json, setJson] = useState(JSON.stringify(ensureConfig(seedConfig), null, 2));
@@ -145,7 +151,11 @@ function AdminPage() {
   const hasUnappliedJsonDraft = json !== JSON.stringify(config, null, 2);
   const hasUnsavedWork = hasUnsavedChanges || hasUnappliedJsonDraft;
   const testComplete = coreCards.length > 0 && coreCards.every((card) => testLevels[card.id] !== undefined && testLevels[card.id] !== null && testLevels[card.id] !== "");
-  const testMatchedScenario = useMemo(() => (testComplete ? findMatchingScenario(scenarios, testLevels, coreCards) : null), [testComplete, scenarios, testLevels, coreCards]);
+  const legacyTestMatchedScenario = useMemo(() => (testComplete ? findMatchingScenario(scenarios, testLevels, coreCards) : null), [testComplete, scenarios, testLevels, coreCards]);
+  const ruleTestResult = useMemo(() => (testComplete && config.recommendationModel?.enabled === true
+    ? buildRuleBasedRecommendations(config, testLevels, coreCards, { activeCategories: ["universal", ...testStyles] })
+    : null), [testComplete, config, testLevels, coreCards, testStyles]);
+  const testMatchedScenario = config.recommendationModel?.enabled === true ? ruleTestResult : legacyTestMatchedScenario;
   const testCategories = useMemo(() => [RECOMMENDATION_CATEGORIES[0], ...RECOMMENDATION_CATEGORIES.slice(1).filter((category) => testStyles.includes(category.id))], [testStyles]);
 
   useEffect(() => {
@@ -181,8 +191,7 @@ function AdminPage() {
       };
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
-      // Token refreshes should not clear editor feedback; they do not change the
-      // signed-in identity and must never reset the unsaved configuration draft.
+      // Token refreshes should not clear editor feedback or reset an in-progress draft.
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         setError("");
         setSuccess("");
@@ -194,10 +203,8 @@ function AdminPage() {
     };
   }, []);
 
-  // Depend on stable identity/role values, not the whole session object. Supabase
-  // emits a new session object when a token is refreshed (often when a background
-  // tab becomes active again). Refetching the config for every token refresh used
-  // to overwrite an in-progress editor draft and make the dashboard appear to restart.
+  // Keep remote config loading tied to identity and role, not the whole session object.
+  // Supabase can emit a fresh session object after token refresh when a background tab is focused.
   const sessionUserId = session?.user?.id || null;
   const sessionRole = session?.user?.app_metadata?.role || null;
 
@@ -577,8 +584,8 @@ function AdminPage() {
         <div className="editor-title-row scenario-main-title">
           <div>
             <span className="section-kicker">PRIVATE / RULE WORKSPACE</span>
-            <h1>Scenario builder</h1>
-            <p>Define account conditions and select recommendations manually. The matching engine only evaluates the scenarios you create.</p>
+            <h1>Grandmaster recommendation workspace</h1>
+            <p>Set recommendations once as a reusable base, then add conditional overrides only where a specific Core Card combination changes the result.</p>
           </div>
           <span className="secure-pill">
             <ShieldCheck size={15} /> {localMode ? "Local preview" : "Admin only"}
@@ -600,11 +607,11 @@ function AdminPage() {
           </div>
           <div>
             <span className="summary-number">{recommendationCards.length}</span>
-            <span className="summary-label">SSR cards</span>
+            <span className="summary-label">Support cards</span>
           </div>
           <div>
-            <span className="summary-number">{scenarios.filter((scenario) => scenario.enabled !== false).length}</span>
-            <span className="summary-label">Active scenarios</span>
+            <span className="summary-number">{config.recommendationModel?.overrides?.length || 0}</span>
+            <span className="summary-label">Conditional overrides</span>
           </div>
         </div>
 
@@ -618,6 +625,37 @@ function AdminPage() {
         </nav>
 
         {activeTab === "scenarios" && (
+          <section className="scenario-management-tab">
+            <div className="scenario-workspace-switch" role="group" aria-label="Recommendation workspace mode">
+              <button type="button" className={scenarioWorkspaceMode === "rules" ? "active" : ""} onClick={() => setScenarioWorkspaceMode("rules")}>
+                <Layers size={16} /> Rule-based engine
+              </button>
+              <button type="button" className={scenarioWorkspaceMode === "manual" ? "active" : ""} onClick={() => setScenarioWorkspaceMode("manual")}>
+                <Sparkles size={16} /> Manual scenarios
+              </button>
+              <button type="button" className={scenarioWorkspaceMode === "combinations" ? "active" : ""} onClick={() => setScenarioWorkspaceMode("combinations")}>
+                <Layers size={16} /> Exact combinations (legacy)
+              </button>
+            </div>
+            {scenarioWorkspaceMode === "rules" ? (
+              <RecommendationRuleManager
+                config={config}
+                coreCards={coreCards}
+                cards={recommendationCards}
+                updateConfig={updateConfig}
+                setSuccess={setSuccess}
+                setError={setError}
+              />
+            ) : scenarioWorkspaceMode === "combinations" ? (
+              <CombinationScenarioManager
+                config={config}
+                coreCards={coreCards}
+                cards={recommendationCards}
+                updateConfig={updateConfig}
+                setSuccess={setSuccess}
+                setError={setError}
+              />
+            ) : (
           <div className="scenario-workbench">
             <aside className="scenario-sidebar">
               <div className="scenario-sidebar-head">
@@ -918,6 +956,8 @@ function AdminPage() {
               )}
             </div>
           </div>
+            )}
+          </section>
         )}
 
         {activeTab === "tester" && (
@@ -983,12 +1023,12 @@ function AdminPage() {
             {!testComplete ? (
               <div className="notice notice-preview">
                 <FlaskConical size={17} />
-                <span>Select a level for all six core cards to run the test.</span>
+                <span>Select a level for all six Core Cards to run the test.</span>
               </div>
             ) : !testMatchedScenario ? (
               <div className="notice notice-error">
                 <TriangleAlert size={17} />
-                <span>No scenario matches this test input. Try another combination or create a scenario.</span>
+                <span>{config.recommendationModel?.enabled ? "No base recommendations or matching override produce results for this combination yet." : "No scenario matches this test input. Try another combination or create a scenario."}</span>
               </div>
             ) : (
               <div className="test-result-wrap">
@@ -996,9 +1036,16 @@ function AdminPage() {
                   <div>
                     <span className="section-kicker">MATCH FOUND IN DRAFT</span>
                     <h3>{testMatchedScenario.name}</h3>
-                    <p>
-                      Priority {Number(testMatchedScenario.priority || 0)} · {testMatchedScenario.enabled === false ? "Disabled" : "Active"}
-                    </p>
+                    {testMatchedScenario.isRuleEngineResult ? (
+                      <p>{testMatchedScenario.matchedRules.length ? `Base recommendations + ${testMatchedScenario.matchedRules.length} matching override${testMatchedScenario.matchedRules.length === 1 ? "" : "s"}: ${testMatchedScenario.matchedRules.map((rule) => rule.name).join(", ")}` : "Base recommendations only; no conditional overrides matched."}</p>
+                    ) : (
+                      <p>Priority {Number(testMatchedScenario.priority || 0)} · {testMatchedScenario.enabled === false ? "Disabled" : "Active"}</p>
+                    )}
+                    {testMatchedScenario.isRuleEngineResult && testMatchedScenario.evaluationSummary && (
+                      <p className="test-evaluation-summary">
+                        Automatic evaluation: {testMatchedScenario.evaluationSummary.evaluatedCoreCards} Core Card targets assessed; {testMatchedScenario.evaluationSummary.skippedMaxedCoreCards.length} maxed target{testMatchedScenario.evaluationSummary.skippedMaxedCoreCards.length === 1 ? "" : "s"} hidden; {testMatchedScenario.evaluationSummary.positiveBreakpoints} strong breakpoint upgrade{testMatchedScenario.evaluationSummary.positiveBreakpoints === 1 ? "" : "s"} found.
+                      </p>
+                    )}
                   </div>
                   <span className="secure-pill">
                     <CheckCircle2 size={14} /> Match
@@ -1017,7 +1064,7 @@ function AdminPage() {
                           <span>{items.length} cards</span>
                         </div>
                         {items.length === 0 ? (
-                          <p className="small-note">No recommendations configured for this category.</p>
+                          <p className="small-note">{testMatchedScenario.evaluationSummary?.skippedMaxedCoreCards?.length ? "No eligible exchange target remains here after automatic evaluation." : "No recommendations configured for this category."}</p>
                         ) : (
                           <div className="test-preview-items">
                             {items.map((item, index) => {
@@ -1032,6 +1079,7 @@ function AdminPage() {
                                       {item.status === "alternative" ? "Alternative" : "Recommended"}
                                       {item.note ? ` · ${item.note}` : ""}
                                     </small>
+                                    {item.automaticEvaluation && <small className={`test-evaluation-note tone-${item.automaticEvaluation.tone}`}><strong>{item.automaticEvaluation.title}:</strong> {item.automaticEvaluation.message}</small>}
                                   </div>
                                 </div>
                               );
@@ -1174,5 +1222,3 @@ function AdminPage() {
     </main>
   );
 }
-
-export default AdminPage;

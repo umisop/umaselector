@@ -468,7 +468,7 @@ export default function CommunitySection({ cards, coreCards, levels, allCoreFill
           <div>
             <span className="community-kicker">04 / COMMUNITY KNOWLEDGE</span>
             <h2 id="community-heading">Community Recommendations</h2>
-            <p className="community-section-description">Compare strategies shared by other players.</p>
+            <p className="community-section-description">Compare strategies shared by other players</p>
           </div>
           <div className="community-heading-actions">
             {session?.user ? (
@@ -526,19 +526,6 @@ export default function CommunitySection({ cards, coreCards, levels, allCoreFill
             <option value="oldest">Oldest first</option>
           </select>
         </div>
-
-        {allCoreFilled && !matchedScenario?.id && (
-          <div className="community-general-feed-note" role="status">
-            <MessageSquareText size={15} />
-            <div>
-              <strong>No public scenario matches these Core Card levels.</strong>
-              <p>
-                No public scenario matches this loadout yet, so you can still share and browse recommendations for this exact six-card combination. If the creator later configures a matching public
-                scenario, the posts will be associated with it automatically.
-              </p>
-            </div>
-          </div>
-        )}
 
         {formOpen && (
           <CommunityPostForm
@@ -638,9 +625,20 @@ export default function CommunitySection({ cards, coreCards, levels, allCoreFill
               <MessageSquareText size={22} />
             </div>
             {!allCoreFilled ? (
-              <></>
+              <>
+                <h3>Select your Core Cards to browse Community posts</h3>
+                <p>Community recommendations are matched to the public scenario selected automatically from the six Core Card levels above. Select all six cards to see relevant posts.</p>
+              </>
             ) : !matchedScenario?.id ? (
-              <></>
+              <>
+                <h3>No Community recommendations for these Core Card levels yet</h3>
+                <p>
+                  You can still share a recommendation for this exact six-card combination. Once the creator configures a matching public scenario, the post will be associated with it automatically.
+                </p>
+                <button type="button" className="community-button community-button-muted" onClick={openCreate}>
+                  <Plus size={15} /> Share the first recommendation
+                </button>
+              </>
             ) : (
               <>
                 <h3>No Community recommendations for {matchedScenario.name} yet</h3>
@@ -656,11 +654,6 @@ export default function CommunitySection({ cards, coreCards, levels, allCoreFill
             )}
           </div>
         )}
-
-        <div className="community-section-footnote">
-          <ShieldCheck size={14} />
-          <span>Sign-in is required to upvote or report. Each account can have one active upvote per recommendation. Reported content is reviewed by moderators.</span>
-        </div>
       </section>
 
       {authOpen && (

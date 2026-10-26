@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, CircleHelp, ListChecks, RotateCcw, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, CircleHelp, Info, ListChecks, RotateCcw, Sparkles } from "lucide-react";
 import CardImage from "../components/CardImage";
 import RunningStyleLogo from "../components/RunningStyleLogo";
 import CommunitySection from "../components/CommunitySection";
 import Footer from "../components/Footer";
 import { readSitePreferences, subscribeSitePreferences } from "../lib/sitePreferences";
 import { findMatchingScenario, getScenarioRecommendations, LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, RUNNING_STYLES } from "../lib/scenarioEngine";
+import { buildRuleBasedRecommendations, combineUniversalAndStyleRecommendations, evaluateRecommendationItems } from "../lib/recommendationRules";
 
 const CORE_ORDER = ["kitasan-black", "super-creek", "fine-motion", "agnes-tachyon", "maruzensky", "mr-cb"];
 
@@ -22,7 +23,9 @@ function RecommendationPanel({ category, items, cardMap }) {
   return (
     <section className="result-category" key={category.id}>
       <div className="result-category-heading">
-        <div className="result-category-symbol">{category.id === "universal" ? <Sparkles size={18} /> : <RunningStyleLogo styleId={category.id} className="result-category-style-logo" />}</div>
+        <div className="result-category-symbol">
+          {(category.styleId || category.id) === "universal" ? <Sparkles size={18} /> : <RunningStyleLogo styleId={category.styleId || category.id} className="result-category-style-logo" />}
+        </div>
         <div>
           <h3>{category.label}</h3>
           <p>{category.description}</p>
@@ -31,7 +34,7 @@ function RecommendationPanel({ category, items, cardMap }) {
       {items.length === 0 ? (
         <div className="category-unconfigured">
           <CircleHelp size={16} />
-          <span>The creator has not added recommendations for this category yet.</span>
+          <span>The creator has not added recommendations for this category, or no configured Core Card target is available at the selected levels.</span>
         </div>
       ) : (
         <div className="recommendation-cards">
@@ -39,6 +42,8 @@ function RecommendationPanel({ category, items, cardMap }) {
             const card = cardMap.get(String(item.cardId));
             if (!card) return null;
             const status = item.status === "alternative" ? "alternative" : "recommended";
+            const evaluation = item.automaticEvaluation;
+            const EvaluationIcon = evaluation?.tone === "positive" ? CheckCircle2 : evaluation?.tone === "warning" ? AlertTriangle : Info;
             return (
               <article className={`recommendation-card recommendation-${status}`} key={`${category.id}-${item.cardId}-${index}`}>
                 <CardImage card={card} className="recommendation-card-image" />
@@ -47,6 +52,14 @@ function RecommendationPanel({ category, items, cardMap }) {
                   <h4>{card.name}</h4>
                   <p>{card.type || "Support Card"}</p>
                   {item.note && <p className="recommendation-note">{item.note}</p>}
+                  {evaluation && (
+                    <div className={`recommendation-evaluation tone-${evaluation.tone}`}>
+                      <strong>
+                        <EvaluationIcon size={13} /> {evaluation.title}
+                      </strong>
+                      <p>{evaluation.message}</p>
+                    </div>
+                  )}
                 </div>
                 <span className="recommendation-number">{String(index + 1).padStart(2, "0")}</span>
               </article>
@@ -67,9 +80,49 @@ export default function SelectorPage({ config, loading }) {
   const coreCards = useMemo(() => sortCoreCards(cards.filter((card) => card.isCore)), [cards]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [String(card.id), card])), [cards]);
   const allCoreFilled = coreCards.length > 0 && coreCards.every((card) => levels[card.id] !== undefined && levels[card.id] !== null);
-  const matchedScenario = useMemo(() => (allCoreFilled ? findMatchingScenario(config?.scenarios, levels, coreCards) : null), [allCoreFilled, config?.scenarios, levels, coreCards]);
+  const legacyMatchedScenario = useMemo(() => (allCoreFilled ? findMatchingScenario(config?.scenarios, levels, coreCards) : null), [allCoreFilled, config?.scenarios, levels, coreCards]);
+  const ruleEngineEnabled = config?.recommendationModel?.enabled === true;
+  const ruleBasedResult = useMemo(
+    () => (allCoreFilled && ruleEngineEnabled ? buildRuleBasedRecommendations(config, levels, coreCards, { activeCategories: ["universal", ...selectedStyles] }) : null),
+    [allCoreFilled, ruleEngineEnabled, config, levels, coreCards, selectedStyles],
+  );
+  const evaluatedLegacyScenario = useMemo(() => {
+    if (!legacyMatchedScenario || ruleEngineEnabled) return legacyMatchedScenario;
+    const evaluatedRecommendations = Object.fromEntries(
+      RECOMMENDATION_CATEGORIES.map((category) => [
+        category.id,
+        evaluateRecommendationItems(getScenarioRecommendations(legacyMatchedScenario, category.id), category.id, levels, coreCards, cards).items,
+      ]),
+    );
+    return { ...legacyMatchedScenario, recommendations: evaluatedRecommendations };
+  }, [legacyMatchedScenario, ruleEngineEnabled, levels, coreCards, cards]);
+  const matchedScenario = ruleEngineEnabled ? ruleBasedResult : evaluatedLegacyScenario;
 
-  const categoriesToShow = useMemo(() => [RECOMMENDATION_CATEGORIES[0], ...RECOMMENDATION_CATEGORIES.slice(1).filter((category) => selectedStyles.includes(category.id))], [selectedStyles]);
+  const recommendationGroups = useMemo(() => {
+    if (!matchedScenario) return [];
+    const universal = RECOMMENDATION_CATEGORIES[0];
+    const universalItems = getScenarioRecommendations(matchedScenario, universal.id);
+    const selectedStyleDefinitions = RUNNING_STYLES.filter((style) => selectedStyles.includes(style.id));
+    if (!selectedStyleDefinitions.length) {
+      return [
+        {
+          id: universal.id,
+          label: universal.label,
+          description: universal.description,
+          items: universalItems,
+        },
+      ];
+    }
+    return selectedStyleDefinitions.map((style) => {
+      return {
+        id: `${style.id}-with-universal`,
+        styleId: style.id,
+        label: style.label,
+        description: `Recommendations for ${style.label}.`,
+        items: combineUniversalAndStyleRecommendations(universalItems, getScenarioRecommendations(matchedScenario, style.id)),
+      };
+    });
+  }, [matchedScenario, selectedStyles]);
 
   function toggleStyle(styleId) {
     setSelectedStyles((current) => (current.includes(styleId) ? current.filter((item) => item !== styleId) : [...current, styleId]));
@@ -194,6 +247,24 @@ export default function SelectorPage({ config, loading }) {
               <div className="core-card-content">
                 <span className="core-card-type">{card.type || "Support Card"}</span>
                 <h3>{card.name}</h3>
+                <div className="core-card-description" aria-label={`${card.name} details`}>
+                  <p>
+                    <span>Style</span>
+                    <strong>{card.coreDescription?.style || "Add running style"}</strong>
+                  </p>
+                  <p>
+                    <span>Usable from</span>
+                    <strong>{card.coreDescription?.usableFrom || "Add usable LB"}</strong>
+                  </p>
+                  <p>
+                    <span>Strengths</span>
+                    <strong>{card.coreDescription?.strengths || "Add key strengths"}</strong>
+                  </p>
+                  <p>
+                    <span>Notes</span>
+                    <strong>{card.coreDescription?.notes || "-"}</strong>
+                  </p>
+                </div>
                 <label className="level-control core-level-control">
                   <span>Limit break</span>
                   <select value={levels[card.id] ?? ""} onChange={(event) => changeLevel(card.id, event.target.value)} aria-label={`Choose a level ${card.name}`} required>
@@ -220,9 +291,10 @@ export default function SelectorPage({ config, loading }) {
         <div className="recommendation-heading">
           <div>
             <span className="section-kicker">03 / EXCHANGE SUPOKA</span>
-            <h2>My Recommendation</h2>
+            <h2>Recommendations</h2>
           </div>
         </div>
+
         {!allCoreFilled ? (
           <div className="recommendation-empty">
             <div className="recommendation-icon">
@@ -230,7 +302,7 @@ export default function SelectorPage({ config, loading }) {
             </div>
             <div className="recommendation-copy">
               <h3>Complete all six core cards first</h3>
-              <p>Your card levels are used to match scenarios created by the creator. Results appear after all six are selected.</p>
+              <p>Your six Core Card levels are evaluated against the creator’s saved recommendation setup. Results appear after all six are selected.</p>
             </div>
           </div>
         ) : !matchedScenario ? (
@@ -240,22 +312,26 @@ export default function SelectorPage({ config, loading }) {
             </div>
             <div className="recommendation-copy">
               <h3>No recommendations available</h3>
-              <p>There are no recommendations configured for this combination of core-card levels yet.</p>
+              <p>
+                {ruleEngineEnabled
+                  ? "No base recommendations or matching overrides produce results for this combination yet."
+                  : "There are no recommendations configured for this combination of Core Card levels yet."}
+              </p>
             </div>
           </div>
         ) : (
           <>
             <div className="results-category-list">
-              {categoriesToShow.map((category) => (
-                <RecommendationPanel key={category.id} category={category} items={getScenarioRecommendations(matchedScenario, category.id)} cardMap={cardMap} />
+              {recommendationGroups.map((group) => (
+                <RecommendationPanel key={group.id} category={group} items={group.items} cardMap={cardMap} />
               ))}
             </div>
-            {!selectedStyles.length && <p className="result-hint">Select running styles above to see style-specific recommendations. Universal remains available.</p>}
+            {!selectedStyles.length && <p className="result-hint">Select one or more running styles to combine Universal recommendations with each selected style independently.</p>}
           </>
         )}
       </section>
 
-      <CommunitySection cards={cards} coreCards={coreCards} levels={levels} allCoreFilled={allCoreFilled} matchedScenario={matchedScenario} selectedStyles={selectedStyles} />
+      <CommunitySection cards={cards} coreCards={coreCards} levels={levels} allCoreFilled={allCoreFilled} matchedScenario={legacyMatchedScenario} selectedStyles={selectedStyles} />
 
       <Footer />
     </main>

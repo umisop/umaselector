@@ -43,10 +43,7 @@ function AboutContent() {
         icon={Info}
       />
       <InfoSection title="What this tool does">
-        <p>
-          Card Exchange Selector helps players review support-card exchange options using their selected running styles and the limit-break levels of six core support cards. Official recommendations
-          configured by the site creator are presented separately from community-submitted recommendations.
-        </p>
+        <p>Card Exchange Selector helps players review support-card exchange options using their selected running styles and the limit-break levels of six core support cards.</p>
         <p>The Community section lets signed-in players share their own card recommendations, explain the account conditions they had in mind, and learn from other players' experiences.</p>
       </InfoSection>
       <InfoSection title="Community contributions">
@@ -69,10 +66,6 @@ function AboutContent() {
 function FAQContent() {
   const items = [
     [
-      "Are Community recommendations official?",
-      "No. Official recommendations are configured by the site creator. Community posts are submitted by players and are clearly separate from official recommendations.",
-    ],
-    [
       "Why can I only see recommendations for my current Core Card levels?",
       "The Community feed compares the six Core Card levels selected in the Selector with the snapshot attached to each post. A post for a different loadout is not shown as a match.",
     ],
@@ -81,7 +74,6 @@ function FAQContent() {
       "Can I edit or delete my own post?",
       "Yes. Sign in and open My Profile. You can edit or delete recommendations submitted by your account. Hidden posts may remain visible to you in your profile but not in the public feed.",
     ],
-    ["Can I sign in with Discord?", "Yes, if Discord sign-in is enabled. Your Community display name can be changed from My Profile."],
     [
       "How do I reset my password?",
       "For an email-and-password account, use “Forgot password?” in the Community sign-in form. Discord users should use Discord to manage access to their Discord account.",
@@ -286,7 +278,7 @@ function PrivacyContent() {
       />
       <p className="site-info-legal-intro">
         Your privacy matters. This fan-made site uses a limited amount of information to let you sign in, share card recommendations, and keep the Community safe. We do not sell your personal
-        information. The current version does not use your information for targeted ads or visitor-tracking tools.
+        information.
       </p>
       <InfoSection title="What information is used?">
         <ul>
@@ -338,10 +330,7 @@ function PrivacyContent() {
         </p>
       </InfoSection>
       <InfoSection title="How is information protected?">
-        <p>
-          The site uses account restrictions and access controls to help protect information. No website can promise that data will always be completely safe, so do not share your password, one-time
-          sign-in codes, or private information in a public recommendation or feedback message.
-        </p>
+        <p>The site uses account restrictions and access controls to help protect information.Do not share your password, one-time sign-in codes, or private information.</p>
       </InfoSection>
       <InfoSection title="Changes to this policy">
         <p>
@@ -349,9 +338,6 @@ function PrivacyContent() {
           notice to claim that information is absolutely safe or that risk does not exist.
         </p>
       </InfoSection>
-      <p className="site-info-muted-note">
-        This page explains the site’s current practices in plain language. The site owner should review it against local privacy laws and update it when those practices change.
-      </p>
     </>
   );
 }
@@ -487,9 +473,6 @@ function TermsContent() {
       <InfoSection title="Changes and questions">
         <p>These rules may be updated as the site changes. Questions can be sent through the Feedback page.</p>
       </InfoSection>
-      <p className="site-info-muted-note">
-        These terms are a plain-language draft for the current product, not legal advice. The site operator should review local legal requirements before relying on them as a final legal agreement.
-      </p>
     </>
   );
 }

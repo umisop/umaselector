@@ -16,7 +16,7 @@ export default function Header() {
           <Users size={14} /> Community
         </a>
         <a className="header-admin-link" href="/admin">
-          <ShieldCheck size={14} /> Admin
+          <ShieldCheck size={14} /> Creator
         </a>
       </div>
     </header>
