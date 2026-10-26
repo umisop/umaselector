@@ -1,11 +1,15 @@
 const FOOTER_LINKS = [
-  { href: '/about', label: 'About' },
-  { href: '/faq', label: 'FAQ' },
-  { href: '/feedback', label: 'Feedback' },
-  { href: '/privacy-policy', label: 'Privacy Policy' },
-  { href: '/cookie-settings', label: 'Cookie settings' },
-  { href: '/terms', label: 'Terms of Use' },
-  { href: '/contact', label: 'Contact' },
+  { href: "/about", label: "About" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/feedback", label: "Feedback" },
+  { href: "/privacy-policy", label: "Privacy Policy" },
+  { href: "/cookie-settings", label: "Cookie settings" },
+  { href: "/terms", label: "Terms of Use" },
+  { href: "/contact", label: "Contact" },
+  {
+    label: "GitHub",
+    href: "https://github.com/umisop/umaselector",
+  },
 ];
 
 export default function Footer() {
@@ -13,7 +17,9 @@ export default function Footer() {
     <footer className="site-footer site-footer-rich">
       <nav className="site-footer-links" aria-label="Footer navigation">
         {FOOTER_LINKS.map((link) => (
-          <a href={link.href} key={link.href}>{link.label}</a>
+          <a href={link.href} key={link.href}>
+            {link.label}
+          </a>
         ))}
       </nav>
       <div className="site-footer-disclaimer">

@@ -15,30 +15,36 @@ export function normalizeRecommendationModel(value) {
   const baseSource = source.base && typeof source.base === "object" && !Array.isArray(source.base) ? source.base : {};
   return {
     enabled: source.enabled === true,
-    base: Object.fromEntries(CATEGORY_IDS.map((categoryId) => [
-      categoryId,
-      Array.isArray(baseSource[categoryId]) ? baseSource[categoryId].map((item) => ({ ...item })) : [],
-    ])),
-    overrides: Array.isArray(source.overrides) ? source.overrides.filter((rule) => rule && typeof rule === "object").map((rule, index) => {
-      const rawActions = rule.actions && typeof rule.actions === "object" && !Array.isArray(rule.actions) ? rule.actions : {};
-      return {
-        ...rule,
-        id: String(rule.id || `imported-rule-${index + 1}`),
-        name: String(rule.name || `Rule ${index + 1}`),
-        enabled: rule.enabled !== false,
-        priority: Number.isFinite(Number(rule.priority)) ? Number(rule.priority) : 0,
-        conditions: rule.conditions && typeof rule.conditions === "object" && !Array.isArray(rule.conditions) ? { ...rule.conditions } : {},
-        actions: Object.fromEntries(CATEGORY_IDS.map((categoryId) => {
-          const action = rawActions[categoryId] && typeof rawActions[categoryId] === "object" ? rawActions[categoryId] : {};
-          return [categoryId, {
-            ...action,
-            enabled: action.enabled === true,
-            mode: action.mode === "replace" ? "replace" : "merge",
-            recommendations: Array.isArray(action.recommendations) ? action.recommendations.map((item) => ({ ...item })) : [],
-          }];
-        })),
-      };
-    }) : [],
+    base: Object.fromEntries(CATEGORY_IDS.map((categoryId) => [categoryId, Array.isArray(baseSource[categoryId]) ? baseSource[categoryId].map((item) => ({ ...item })) : []])),
+    overrides: Array.isArray(source.overrides)
+      ? source.overrides
+          .filter((rule) => rule && typeof rule === "object")
+          .map((rule, index) => {
+            const rawActions = rule.actions && typeof rule.actions === "object" && !Array.isArray(rule.actions) ? rule.actions : {};
+            return {
+              ...rule,
+              id: String(rule.id || `imported-rule-${index + 1}`),
+              name: String(rule.name || `Rule ${index + 1}`),
+              enabled: rule.enabled !== false,
+              priority: Number.isFinite(Number(rule.priority)) ? Number(rule.priority) : 0,
+              conditions: rule.conditions && typeof rule.conditions === "object" && !Array.isArray(rule.conditions) ? { ...rule.conditions } : {},
+              actions: Object.fromEntries(
+                CATEGORY_IDS.map((categoryId) => {
+                  const action = rawActions[categoryId] && typeof rawActions[categoryId] === "object" ? rawActions[categoryId] : {};
+                  return [
+                    categoryId,
+                    {
+                      ...action,
+                      enabled: action.enabled === true,
+                      mode: action.mode === "replace" ? "replace" : "merge",
+                      recommendations: Array.isArray(action.recommendations) ? action.recommendations.map((item) => ({ ...item })) : [],
+                    },
+                  ];
+                }),
+              ),
+            };
+          })
+      : [],
   };
 }
 
@@ -50,18 +56,27 @@ export function createRecommendationOverride(coreCards, count = 1) {
     enabled: true,
     priority: 0,
     conditions: Object.fromEntries((coreCards || []).map((card) => [card.id, "any"])),
-    actions: Object.fromEntries(CATEGORY_IDS.map((categoryId) => [categoryId, {
-      enabled: false,
-      mode: "merge",
-      recommendations: [],
-    }])),
+    actions: Object.fromEntries(
+      CATEGORY_IDS.map((categoryId) => [
+        categoryId,
+        {
+          enabled: false,
+          mode: "merge",
+          recommendations: [],
+        },
+      ]),
+    ),
   };
 }
 
 export function recommendationModelHasContent(model) {
   if (!model || typeof model !== "object") return false;
   const baseHasItems = CATEGORY_IDS.some((categoryId) => Array.isArray(model.base?.[categoryId]) && model.base[categoryId].length > 0);
-  return baseHasItems || (Array.isArray(model.overrides) && model.overrides.some((rule) => Object.values(rule?.actions || {}).some((action) => action?.enabled && Array.isArray(action.recommendations) && action.recommendations.length > 0)));
+  return (
+    baseHasItems ||
+    (Array.isArray(model.overrides) &&
+      model.overrides.some((rule) => Object.values(rule?.actions || {}).some((action) => action?.enabled && Array.isArray(action.recommendations) && action.recommendations.length > 0)))
+  );
 }
 
 /**
@@ -114,11 +129,11 @@ function applyRuleAction(currentItems, action) {
 
 const LEVEL_LABELS = {
   "-1": "Not owned",
-  "0": "LB0",
-  "1": "LB1",
-  "2": "LB2",
-  "3": "LB3",
-  "4": "LB4",
+  0: "LB0",
+  1: "LB1",
+  2: "LB2",
+  3: "LB3",
+  4: "LB4",
 };
 
 function levelLabel(level) {
@@ -146,7 +161,11 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
   switch (String(card?.id || "")) {
     case "kitasan-black":
       if (currentLevel < 2) {
-        return result("warning", "Below the LB3 target", `This exchange would bring Kitasan Black to ${levelLabel(nextLevel)}, still below your preferred LB3 breakpoint. Consider how much you need this upgrade for the selected running style before spending an exchange.`);
+        return result(
+          "warning",
+          "Below the LB3 target",
+          `This exchange would bring Kitasan Black to ${levelLabel(nextLevel)}, still below your preferred LB3 breakpoint. Consider how much you need this upgrade for the selected running style before spending an exchange.`,
+        );
       }
       if (currentLevel === 2) {
         return result("positive", "Good upgrade", "This exchange reaches LB3, your stated strong target for Kitasan Black.");
@@ -157,10 +176,19 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
       break;
     case "super-creek":
       if (currentLevel === -1) {
-        return result("info", "Adds a usable card", "Super Creek is already usable at LB0 according to your rule. This exchange would add it at LB0; it does not reach the LB3 initial-gauge improvement.", "recommended");
+        return result(
+          "info",
+          "Adds a usable card",
+          "Super Creek is already usable at LB0 according to your rule. This exchange would add it at LB0; it does not reach the LB3 initial-gauge improvement.",
+          "recommended",
+        );
       }
       if (currentLevel < 2) {
-        return result("info", "Already usable below LB3", `This exchange would bring Super Creek to ${levelLabel(nextLevel)}. LB0 is already usable; LB3 is the breakpoint you identified for improved initial gauge.`);
+        return result(
+          "info",
+          "Already usable below LB3",
+          `This exchange would bring Super Creek to ${levelLabel(nextLevel)}. LB0 is already usable; LB3 is the breakpoint you identified for improved initial gauge.`,
+        );
       }
       if (currentLevel === 2) {
         return result("positive", "Initial-gauge upgrade", "This exchange reaches LB3, the level you identified for improved initial gauge.");
@@ -172,30 +200,54 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
     case "fine-motion":
       if (currentLevel < 2) {
         if (otherCoreCardsAtMax) {
-          return result("warning", "Potentially low-value Wisdom exchange", `The other five Core Cards are already LB4, while this exchange would bring Fine Motion only to ${levelLabel(nextLevel)}, below the preferred LB3 breakpoint. Fine Motion can still be used, but compare this with other targets. If your next scenario follows the one-Wisdom setup you described for Medium/Mile with Ramonu filling the slot, a stronger Wisdom card may take priority.`);
+          return result(
+            "warning",
+            "Potentially low-value Wisdom exchange",
+            `The other five Core Cards are already LB4, while this exchange would bring Fine Motion only to ${levelLabel(nextLevel)}, below the preferred LB3 breakpoint. Fine Motion can still be used, but compare this with other targets. If your next scenario follows the one-Wisdom setup you described for Medium/Mile with Ramonu filling the slot, a stronger Wisdom card may take priority.`,
+          );
         }
         if (currentLevel === -1) {
-          return result("warning", "Does not reach the usable LB1 level", "This exchange adds Fine Motion at LB0. You said LB1 is usable and LB3/LB4 are stronger, so this is still below the first usable breakpoint.");
+          return result(
+            "warning",
+            "Does not reach the usable LB1 level",
+            "This exchange adds Fine Motion at LB0. You said LB1 is usable and LB3/LB4 are stronger, so this is still below the first usable breakpoint.",
+          );
         }
-        return result("warning", "Below the preferred LB3 target", `This exchange would bring Fine Motion to ${levelLabel(nextLevel)}. LB1 is usable, but LB3/LB4 are stronger; this exchange does not reach LB3.`);
+        return result(
+          "warning",
+          "Below the preferred LB3 target",
+          `This exchange would bring Fine Motion to ${levelLabel(nextLevel)}. LB1 is usable, but LB3/LB4 are stronger; this exchange does not reach LB3.`,
+        );
       }
       if (currentLevel === 2) {
         return result("positive", "Good upgrade", "This exchange takes Fine Motion from LB2 to LB3, the stronger breakpoint you identified.");
       }
       if (currentLevel === 3) {
-        return result("warning", "Check the marginal Wisdom upgrade", "Fine Motion is already in its stronger LB3 range; this exchange would reach LB4. Compare the marginal value with other exchange targets before spending the exchange.");
+        return result(
+          "warning",
+          "Check the marginal Wisdom upgrade",
+          "Fine Motion is already in its stronger LB3 range; this exchange would reach LB4. Compare the marginal value with other exchange targets before spending the exchange.",
+        );
       }
       break;
     case "agnes-tachyon":
       if (categoryId === "pc") {
         if (currentLevel < 2) {
-          return result("warning", "Still below the required LB3 target", `This exchange would bring Agnes Tachyon to ${levelLabel(nextLevel)}, which remains below your LB3 requirement for Pace Chaser. Consider whether you can complete the path to LB3 before prioritizing it.`);
+          return result(
+            "warning",
+            "Still below the required LB3 target",
+            `This exchange would bring Agnes Tachyon to ${levelLabel(nextLevel)}, which remains below your LB3 requirement for Pace Chaser. Consider whether you can complete the path to LB3 before prioritizing it.`,
+          );
         }
         if (currentLevel === 2) {
           return result("positive", "Reaches the required LB3", "This exchange brings Agnes Tachyon from LB2 to LB3, your required Pace Chaser target.");
         }
         if (currentLevel === 3) {
-          return result("info", "LB3 requirement already met", "Agnes Tachyon already meets your stated Pace Chaser target at LB3. This exchange would reach LB4; no additional LB4 requirement has been specified.");
+          return result(
+            "info",
+            "LB3 requirement already met",
+            "Agnes Tachyon already meets your stated Pace Chaser target at LB3. This exchange would reach LB4; no additional LB4 requirement has been specified.",
+          );
         }
       }
       break;
@@ -212,7 +264,11 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         return result("warning", "Low-value LB1 → LB2 upgrade", "You specified that Maruzensky's LB1 to LB2 performance increase is poor. Consider saving this exchange toward LB3 or another target.");
       }
       if (currentLevel === 2) {
-        return result("positive", "Reaches the strong LB3 target", "This exchange brings Maruzensky to LB3, a very valuable breakpoint in your strategy. This is a strong upgrade, not merely a generic Core Card exchange.");
+        return result(
+          "positive",
+          "Reaches the strong LB3 target",
+          "This exchange brings Maruzensky to LB3, a very valuable breakpoint in your strategy. This is a strong upgrade, not merely a generic Core Card exchange.",
+        );
       }
       if (currentLevel === 3) {
         return result("warning", "Small LB3 → LB4 improvement", "You specified that Maruzensky's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");
@@ -221,19 +277,23 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
     case "mr-cb":
       if (categoryId === "ec") {
         if (currentLevel === -1) {
-          return result("warning", "Not usable yet after one exchange", "One exchange would bring Wit CB to LB0. Your stated usable threshold for End Closer is LB1, so another copy would still be needed.");
+          return result(
+            "warning",
+            "Not usable yet after one exchange",
+            "One exchange would bring Wit CB to LB0. Your stated usable threshold for End Closer is LB1, so another copy would still be needed.",
+          );
         }
         if (currentLevel === 0) {
-          return result("positive", "Reaches usable LB1", "This exchange brings Wit CB to LB1, which is already usable for End Closer. LB3 is a good target, not a requirement; evaluate later upgrades separately rather than treating LB1 as unusable.");
+          return result("positive", "Reaches usable LB1", "This exchange brings Wit CB to LB1, which is already usable for End Closer. LB3 is a good target");
         }
         if (currentLevel === 1) {
-          return result("warning", "Low-value LB1 → LB2 upgrade", "Using your Maruzensky-like breakpoint rule, Wit CB's LB1 to LB2 step is not a strong upgrade. Consider saving this exchange toward LB3 or another target.");
+          return result("warning", "Low-value LB1 → LB2 upgrade", "Wit CB's LB1 to LB2 step is not a strong upgrade. Consider saving this exchange toward LB3 or another target.");
         }
         if (currentLevel === 2) {
           return result("positive", "Reaches good LB3 level", "This exchange brings Wit CB to LB3, which you identified as a good level for End Closer. LB3 is a good target, not a hard requirement.");
         }
         if (currentLevel === 3) {
-          return result("warning", "Small LB3 → LB4 improvement", "Using your Maruzensky-like breakpoint rule, Wit CB's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");
+          return result("warning", "Small LB3 → LB4 improvement", "Wit CB's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");
         }
       }
       break;
@@ -242,11 +302,19 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
   }
 
   if (isWisdomCard(card)) {
-    return result("warning", "Wisdom Core Card check", `This exchange would bring ${card.name} from ${levelLabel(currentLevel)} to ${levelLabel(nextLevel)}. The card-specific breakpoint guidance is tied to its intended running style, so confirm that this category is appropriate and compare the value with other exchange options.`);
+    return result(
+      "warning",
+      "Wisdom Core Card check",
+      `This exchange would bring ${card.name} from ${levelLabel(currentLevel)} to ${levelLabel(nextLevel)}. The card-specific breakpoint guidance is tied to its intended running style, so confirm that this category is appropriate and compare the value with other exchange options.`,
+    );
   }
 
   if (coreCards.some((core) => String(core.id) === String(card?.id))) {
-    return result("info", "Core Card exchange", `This exchange would bring ${card.name} from ${levelLabel(currentLevel)} to ${levelLabel(nextLevel)}. No automatic breakpoint rule has been defined for this card in this category yet.`);
+    return result(
+      "info",
+      "Core Card exchange",
+      `This exchange would bring ${card.name} from ${levelLabel(currentLevel)} to ${levelLabel(nextLevel)}. No automatic breakpoint rule has been defined for this card in this category yet.`,
+    );
   }
 
   return null;
@@ -285,7 +353,8 @@ export function evaluateRecommendationItems(items, categoryId, viewerLevels, cor
       evaluation = {
         tone: "warning",
         title: "Wisdom exchange check",
-        message: "This is a Wisdom-card exchange. The current inventory selector tracks only six Core Cards, so this card's current LB and resulting level are unknown. Check its upgrade breakpoint and whether it will be used in your deck.",
+        message:
+          "This is a Wisdom-card exchange. The current inventory selector tracks only six Core Cards, so this card's current LB and resulting level are unknown. Check its upgrade breakpoint and whether it will be used in your deck.",
       };
     }
 
@@ -293,12 +362,21 @@ export function evaluateRecommendationItems(items, categoryId, viewerLevels, cor
     if (evaluation?.tone === "positive") summary.positiveBreakpoints += 1;
     // Automatically move positively evaluated core breakpoints ahead of unassessed candidates,
     // and keep cautionary exchanges below them without changing relative order inside each group.
-    const evaluatedStatus = isCoreTarget && evaluation
-      ? (evaluation.recommendationStatus || (evaluation.tone === "positive" ? "recommended" : "alternative"))
-      : (rawItem.status === "alternative" ? "alternative" : "recommended");
+    const evaluatedStatus =
+      isCoreTarget && evaluation
+        ? evaluation.recommendationStatus || (evaluation.tone === "positive" ? "recommended" : "alternative")
+        : rawItem.status === "alternative"
+          ? "alternative"
+          : "recommended";
     const evaluationRank = evaluation?.tone === "positive" ? 3 : evaluation?.tone === "info" ? 2 : evaluation?.tone === "warning" ? 1 : 2;
     const statusRank = evaluatedStatus === "alternative" ? 0 : 1;
-    result.push({ ...rawItem, status: evaluatedStatus, ...(evaluation ? { automaticEvaluation: evaluation } : {}), _automaticRank: statusRank * 10 + evaluationRank, _automaticOriginalIndex: originalIndex });
+    result.push({
+      ...rawItem,
+      status: evaluatedStatus,
+      ...(evaluation ? { automaticEvaluation: evaluation } : {}),
+      _automaticRank: statusRank * 10 + evaluationRank,
+      _automaticOriginalIndex: originalIndex,
+    });
   }
 
   result.sort((a, b) => b._automaticRank - a._automaticRank || a._automaticOriginalIndex - b._automaticOriginalIndex);
@@ -313,21 +391,21 @@ export function buildRuleBasedRecommendations(config, viewerLevels, coreCards, o
   const model = normalizeRecommendationModel(config?.recommendationModel);
   if (!model.enabled) return null;
 
-  const recommendations = Object.fromEntries(CATEGORY_IDS.map((categoryId) => [
-    categoryId,
-    [...(model.base[categoryId] || [])].map((item) => ({ ...item })),
-  ]));
+  const recommendations = Object.fromEntries(CATEGORY_IDS.map((categoryId) => [categoryId, [...(model.base[categoryId] || [])].map((item) => ({ ...item }))]));
 
   const matchingRules = model.overrides
     .map((rule, index) => ({ rule, index, specificity: scenarioSpecificity(rule, coreCards), precision: scenarioConditionPrecision(rule, coreCards) }))
     .filter(({ rule }) => scenarioMatches(rule, viewerLevels, coreCards))
     // Apply broad rules first so more specific rules can override them.
-    .sort((a, b) => a.specificity - b.specificity
-      || a.precision - b.precision
-      || Number(a.rule.priority || 0) - Number(b.rule.priority || 0)
-      // For tied rules, apply the later list entry first so the earlier one wins,
-      // matching the legacy scenario engine's tie-break behavior.
-      || b.index - a.index);
+    .sort(
+      (a, b) =>
+        a.specificity - b.specificity ||
+        a.precision - b.precision ||
+        Number(a.rule.priority || 0) - Number(b.rule.priority || 0) ||
+        // For tied rules, apply the later list entry first so the earlier one wins,
+        // matching the legacy scenario engine's tie-break behavior.
+        b.index - a.index,
+    );
 
   for (const { rule } of matchingRules) {
     for (const categoryId of CATEGORY_IDS) {
@@ -340,23 +418,27 @@ export function buildRuleBasedRecommendations(config, viewerLevels, coreCards, o
   const hasCandidateRecommendations = CATEGORY_IDS.some((categoryId) => recommendations[categoryId].length > 0);
   if (!hasCandidateRecommendations) return null;
 
-  const activeCategories = Array.isArray(options.activeCategories)
-    ? new Set(options.activeCategories.filter((categoryId) => CATEGORY_IDS.includes(categoryId)))
-    : new Set(CATEGORY_IDS);
-  const evaluated = Object.fromEntries(CATEGORY_IDS.map((categoryId) => [categoryId,
-    activeCategories.has(categoryId)
-      ? evaluateRecommendationItems(recommendations[categoryId], categoryId, viewerLevels, coreCards, config?.cards)
-      : { items: recommendations[categoryId], summary: { evaluatedCoreCards: 0, wisdomWarnings: 0, positiveBreakpoints: 0, skippedMaxedCoreCards: [] } },
-  ]));
+  const activeCategories = Array.isArray(options.activeCategories) ? new Set(options.activeCategories.filter((categoryId) => CATEGORY_IDS.includes(categoryId))) : new Set(CATEGORY_IDS);
+  const evaluated = Object.fromEntries(
+    CATEGORY_IDS.map((categoryId) => [
+      categoryId,
+      activeCategories.has(categoryId)
+        ? evaluateRecommendationItems(recommendations[categoryId], categoryId, viewerLevels, coreCards, config?.cards)
+        : { items: recommendations[categoryId], summary: { evaluatedCoreCards: 0, wisdomWarnings: 0, positiveBreakpoints: 0, skippedMaxedCoreCards: [] } },
+    ]),
+  );
   const finalRecommendations = Object.fromEntries(CATEGORY_IDS.map((categoryId) => [categoryId, evaluated[categoryId].items]));
-  const evaluationSummary = CATEGORY_IDS.reduce((summary, categoryId) => {
-    const current = evaluated[categoryId].summary;
-    summary.evaluatedCoreCards += current.evaluatedCoreCards;
-    summary.wisdomWarnings += current.wisdomWarnings;
-    summary.positiveBreakpoints += current.positiveBreakpoints;
-    summary.skippedMaxedCoreCards.push(...current.skippedMaxedCoreCards);
-    return summary;
-  }, { evaluatedCoreCards: 0, wisdomWarnings: 0, positiveBreakpoints: 0, skippedMaxedCoreCards: [] });
+  const evaluationSummary = CATEGORY_IDS.reduce(
+    (summary, categoryId) => {
+      const current = evaluated[categoryId].summary;
+      summary.evaluatedCoreCards += current.evaluatedCoreCards;
+      summary.wisdomWarnings += current.wisdomWarnings;
+      summary.positiveBreakpoints += current.positiveBreakpoints;
+      summary.skippedMaxedCoreCards.push(...current.skippedMaxedCoreCards);
+      return summary;
+    },
+    { evaluatedCoreCards: 0, wisdomWarnings: 0, positiveBreakpoints: 0, skippedMaxedCoreCards: [] },
+  );
 
   return {
     id: "rule-based-recommendations",
