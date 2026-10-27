@@ -15,6 +15,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import CardImage from "./CardImage";
+import RecommendationSkillFields from "./RecommendationSkillFields";
 import RunningStyleLogo from "./RunningStyleLogo";
 import { LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, makeEmptyRecommendations, conditionIsAny, getConditionValues } from "../lib/scenarioEngine";
 import {
@@ -105,10 +106,13 @@ function ConditionSelector({ card, value, onChange }) {
 }
 
 function itemForDisplay(item, index) {
+  const minUsableLb = item?.minUsableLb;
   return {
     cardId: String(item?.cardId ?? ""),
     status: item?.status === "alternative" ? "alternative" : "recommended",
     note: String(item?.note || ""),
+    minUsableLb: [0, 1, 2, 3, 4].includes(Number(minUsableLb)) && minUsableLb !== null && minUsableLb !== undefined && minUsableLb !== "" ? Number(minUsableLb) : null,
+    skills: Array.isArray(item?.skills) ? item.skills.filter((skill) => skill && skill.id !== undefined).map((skill) => ({ id: String(skill.id), name: String(skill.name || "") })) : [],
     action: item?.action === "remove" ? "remove" : "add",
     _key: `${item?.cardId ?? "card"}-${index}`,
   };
@@ -145,6 +149,18 @@ export default function RecommendationRuleManager({ config, coreCards = [], card
     updateConfig((current) => {
       const currentModel = normalizeRecommendationModel(current.recommendationModel || createEmptyRecommendationModel());
       return { ...current, recommendationModel: mutator(currentModel) };
+    });
+  }
+
+  function updateSkillOverride(skillId, activationExplanation) {
+    const id = String(skillId || "");
+    if (!/^\d{4,8}$/.test(id)) return;
+    updateConfig((current) => {
+      const priorMap = current.skillOverrides && typeof current.skillOverrides === "object" ? current.skillOverrides : {};
+      const prior = priorMap[id] && typeof priorMap[id] === "object" ? priorMap[id] : {};
+      const skillOverrides = { ...priorMap, [id]: { ...prior, activationExplanation: String(activationExplanation || "") } };
+      if (!String(activationExplanation || "").trim()) delete skillOverrides[id];
+      return { ...current, skillOverrides };
     });
   }
 
@@ -244,7 +260,7 @@ export default function RecommendationRuleManager({ config, coreCards = [], card
       setError("This card is already listed in this category. Edit the existing row instead.");
       return;
     }
-    updateActiveItems((items) => [...items, { cardId: String(selectedCard.id), status: "recommended", note: "" }]);
+    updateActiveItems((items) => [...items, { cardId: String(selectedCard.id), status: "recommended", note: "", minUsableLb: null, skills: [] }]);
     setNewRecCardId("");
     setNewRecSearch("");
     setError("");
@@ -331,7 +347,7 @@ export default function RecommendationRuleManager({ config, coreCards = [], card
           </div>
           <p className="category-help">{CATEGORY_TABS.find((category) => category.id === activeCategory)?.description} The selected category is part of the reusable base, not tied to one six-card combination.</p>
           <RecommendationPicker cards={cards} search={newRecSearch} setSearch={setNewRecSearch} selectedId={newRecCardId} setSelectedId={setNewRecCardId} selectedCard={selectedCard} filteredCards={filteredCards} onAdd={addRecommendation} activeItems={activeItems} />
-          <RecommendationItemList items={activeItems} cards={cards} isOverride={false} onUpdate={updateItem} onMove={moveItem} onRemove={removeItem} />
+          <RecommendationItemList items={activeItems} cards={cards} isOverride={false} onUpdate={updateItem} onMove={moveItem} onRemove={removeItem} skillOverrides={config.skillOverrides || {}} onUpdateSkillOverride={updateSkillOverride} />
           <div className="scenario-summary-note"><ShieldCheck size={17} /><p>Universal recommendations are included for all running styles. Each style-specific category is added by the public Selector when that style is selected.</p></div>
         </div>
       ) : (
@@ -364,7 +380,7 @@ export default function RecommendationRuleManager({ config, coreCards = [], card
                   <label className="field-label">When this category is affected<select value={activeAction.mode || "merge"} onChange={(event) => patchSelectedRule((rule) => ({ ...rule, actions: { ...(rule.actions || {}), [activeCategory]: { ...(rule.actions?.[activeCategory] || { enabled: false, recommendations: [] }), mode: event.target.value, recommendations: event.target.value === "replace" ? (rule.actions?.[activeCategory]?.recommendations || []).map(({ action, ...item }) => item) : (rule.actions?.[activeCategory]?.recommendations || []) } } }))}><option value="merge">Merge with base recommendations</option><option value="replace">Replace entire category</option></select></label>
                 </div>
                 <RecommendationPicker cards={cards} search={newRecSearch} setSearch={setNewRecSearch} selectedId={newRecCardId} setSelectedId={setNewRecCardId} selectedCard={selectedCard} filteredCards={filteredCards} onAdd={addRecommendation} activeItems={activeItems} />
-                <RecommendationItemList items={activeItems} cards={cards} isOverride onUpdate={updateItem} onMove={moveItem} onRemove={removeItem} mode={activeAction.mode || "merge"} />
+                <RecommendationItemList items={activeItems} cards={cards} isOverride onUpdate={updateItem} onMove={moveItem} onRemove={removeItem} mode={activeAction.mode || "merge"} skillOverrides={config.skillOverrides || {}} onUpdateSkillOverride={updateSkillOverride} />
               </div>
             </div>
           ) : (
@@ -387,7 +403,7 @@ function RecommendationPicker({ cards, search, setSearch, selectedId, setSelecte
   );
 }
 
-function RecommendationItemList({ items, cards, isOverride, onUpdate, onMove, onRemove, mode = "merge" }) {
+function RecommendationItemList({ items, cards, isOverride, onUpdate, onMove, onRemove, mode = "merge", skillOverrides = {}, onUpdateSkillOverride }) {
   if (!items.length) return <div className="recommendation-editor-empty"><Layers size={22} /><strong>No recommendations configured</strong><p>{isOverride ? "Add a card to the rule, update a base recommendation, or exclude a base card." : "Add the reusable base recommendations for this category."}</p></div>;
   return <div className="recommendation-editor-list rule-recommendation-list">{items.map((rawItem, index) => {
     const item = itemForDisplay(rawItem, index);
@@ -399,7 +415,12 @@ function RecommendationItemList({ items, cards, isOverride, onUpdate, onMove, on
       <CardImage card={card} className="recommendation-editor-image" />
       <div className="recommendation-editor-fields"><div className="rec-title-row"><div><strong>{card.name}</strong><small>{card.type || "Support Card"}</small></div><button type="button" className="icon-button icon-button-danger" title="Remove item" aria-label={`Remove ${card.name}`} onClick={() => onRemove(index)}><X size={16} /></button></div>
         {isOverride && mode === "merge" && <label className="field-label">Effect<select value={item.action} onChange={(event) => onUpdate(index, { action: event.target.value })}><option value="add">Add / update this card</option><option value="remove">Exclude this card from results</option></select></label>}
-        {!removing && <><label className="field-label">Recommendation status<select value={item.status} onChange={(event) => onUpdate(index, { status: event.target.value })}><option value="recommended">Recommended</option><option value="alternative">Alternative</option></select></label><label className="field-label">Optional note<input value={item.note} onChange={(event) => onUpdate(index, { note: event.target.value })} placeholder={isOverride ? "Example: warning for this exact condition…" : "Example: exchange for LB3, useful for…"} /></label></>}
+        {!removing && <>
+          <label className="field-label">Recommendation status<select value={item.status} onChange={(event) => onUpdate(index, { status: event.target.value })}><option value="recommended">Recommended</option><option value="alternative">Alternative</option></select></label>
+          <label className="field-label">Minimum usable LB<select value={item.minUsableLb ?? ""} onChange={(event) => onUpdate(index, { minUsableLb: event.target.value === "" ? null : Number(event.target.value) })}><option value="">Not set</option>{[0, 1, 2, 3, 4].map((level) => <option key={level} value={level}>LB{level}</option>)}</select></label>
+          <RecommendationSkillFields skills={item.skills} onChange={(skills) => onUpdate(index, { skills })} skillOverrides={skillOverrides} onUpdateSkillOverride={onUpdateSkillOverride} />
+          <label className="field-label">Optional note<input value={item.note} onChange={(event) => onUpdate(index, { note: event.target.value })} placeholder={isOverride ? "Example: warning for this exact condition…" : "Example: exchange for LB3, useful for…"} /></label>
+        </>}
       </div>
     </article>;
   })}</div>;

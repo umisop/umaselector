@@ -171,7 +171,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         return result("positive", "Good upgrade", "This exchange reaches LB3, your stated strong target for Kitasan Black.");
       }
       if (currentLevel === 3) {
-        return result("info", "Already at target LB3", "This exchange would reach LB4. LB3 is already your stated strong breakpoint, so compare the extra copy with other targets.");
+        return result("positive", "Already at target LB3", "This exchange would reach LB4. LB3 is already your stated strong breakpoint, so compare the extra copy with other targets.");
       }
       break;
     case "super-creek":
@@ -234,7 +234,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
           return result("positive", "Reaches the required LB3", "This exchange brings Agnes Tachyon from LB2 to LB3, your required Pace Chaser target.");
         }
         if (currentLevel === 3) {
-          return result("info", "LB3 requirement already met", "Agnes Tachyon already meets stated Pace Chaser target at LB3. Going LB4, make you get +2 sp bonus. Very Good Upgrade");
+          return result("positive", "LB3 requirement already met", "But LB4 make this card good for SP gain, make you get +2 sp bonus. Very Good Upgrade");
         }
       }
       break;
@@ -268,11 +268,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
     case "mr-cb":
       if (categoryId === "ec") {
         if (currentLevel === -1) {
-          return result(
-            "warning",
-            "Not usable yet after one exchange",
-            "One exchange would bring Wit CB to LB0. Your stated usable threshold for End Closer is LB1, so another copy would still be needed.",
-          );
+          return result("warning", "Not usable yet after one exchange", "One exchange would bring Wit CB to LB0. usable threshold for End Closer is LB1, so another copy  still be needed.");
         }
         if (currentLevel === 0) {
           return result("positive", "Reaches usable LB1", "This exchange brings Wit CB to LB1, which is already usable for End Closer. LB3 is a good target");
@@ -295,7 +291,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
   if (isWisdomCard(card)) {
     return result(
       "warning",
-      "Wisdom Core Card check",
+      "Wit Core Card check",
       `This exchange would bring ${card.name} from ${levelLabel(currentLevel)} to ${levelLabel(nextLevel)}. The card-specific breakpoint guidance is tied to its intended running style, so confirm that this category is appropriate and compare the value with other exchange options.`,
     );
   }
@@ -343,9 +339,9 @@ export function evaluateRecommendationItems(items, categoryId, viewerLevels, cor
     } else if (isWisdomCard(card)) {
       evaluation = {
         tone: "warning",
-        title: "Wisdom exchange check",
+        title: "Wit Card exchange check",
         message:
-          "This is a Wisdom-card exchange. The current inventory selector tracks only six Core Cards, so this card's current LB and resulting level are unknown. Check its upgrade breakpoint and whether it will be used in your deck.",
+          "This is a Wit exchange. Using a selector on a Wit card is usually low value since after Grandmaster only uses one Wit slot, unless it’s just one copy away from its usable LB threshold.",
       };
     }
 

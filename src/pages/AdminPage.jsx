@@ -32,6 +32,7 @@ import CardImage from "../components/CardImage";
 import RunningStyleLogo from "../components/RunningStyleLogo";
 import CombinationScenarioManager from "../components/CombinationScenarioManager";
 import RecommendationRuleManager from "../components/RecommendationRuleManager";
+import RecommendationSkillFields from "../components/RecommendationSkillFields";
 import { findMatchingScenario, getScenarioRecommendations, makeEmptyConditions, makeEmptyRecommendations, RECOMMENDATION_CATEGORIES, RUNNING_STYLES, validateConfig } from "../lib/scenarioEngine";
 import { createEmptyRecommendationModel, normalizeRecommendationModel, buildRuleBasedRecommendations } from "../lib/recommendationRules";
 
@@ -87,6 +88,7 @@ function ensureConfig(value) {
     ...seedConfig,
     ...source,
     cards,
+    skillOverrides: source.skillOverrides && typeof source.skillOverrides === "object" && !Array.isArray(source.skillOverrides) ? source.skillOverrides : {},
     recommendationModel: normalizeRecommendationModel(source.recommendationModel || createEmptyRecommendationModel()),
     scenarios: Array.isArray(source.scenarios)
       ? source.scenarios.map((scenario) => ({
@@ -256,6 +258,18 @@ export default function AdminPage() {
     setError("");
   }
 
+  function updateSkillOverride(skillId, activationExplanation) {
+    const id = String(skillId || "");
+    if (!/^\d{4,8}$/.test(id)) return;
+    updateConfig((current) => {
+      const currentOverrides = current.skillOverrides && typeof current.skillOverrides === "object" ? current.skillOverrides : {};
+      const prior = currentOverrides[id] && typeof currentOverrides[id] === "object" ? currentOverrides[id] : {};
+      const nextOverrides = { ...currentOverrides, [id]: { ...prior, activationExplanation: String(activationExplanation || "") } };
+      if (!String(activationExplanation || "").trim()) delete nextOverrides[id];
+      return { ...current, skillOverrides: nextOverrides };
+    });
+  }
+
   function updateScenario(patch) {
     if (!selectedScenario) return;
     updateConfig((current) => ({
@@ -312,7 +326,7 @@ export default function AdminPage() {
       recommendations: {
         ...makeEmptyRecommendations(),
         ...(scenario.recommendations || {}),
-        [activeCategory]: [...(scenario.recommendations?.[activeCategory] || []), { cardId: newRecCardId, status: "recommended", note: "" }],
+        [activeCategory]: [...(scenario.recommendations?.[activeCategory] || []), { cardId: newRecCardId, status: "recommended", note: "", minUsableLb: null, skills: [] }],
       },
     }));
     setNewRecCardId("");
@@ -938,6 +952,14 @@ export default function AdminPage() {
                                   <option value="alternative">Alternative</option>
                                 </select>
                               </label>
+                              <label className="field-label">
+                                Minimum usable LB
+                                <select value={item.minUsableLb ?? ""} onChange={(event) => updateRecommendation(index, { minUsableLb: event.target.value === "" ? null : Number(event.target.value) })}>
+                                  <option value="">Not set</option>
+                                  {[0, 1, 2, 3, 4].map((level) => <option key={level} value={level}>LB{level}</option>)}
+                                </select>
+                              </label>
+                              <RecommendationSkillFields skills={item.skills || []} onChange={(skills) => updateRecommendation(index, { skills })} skillOverrides={config.skillOverrides || {}} onUpdateSkillOverride={updateSkillOverride} />
                               <label className="field-label">
                                 Optional note
                                 <input value={item.note || ""} onChange={(event) => updateRecommendation(index, { note: event.target.value })} placeholder="Example: use this when…" />

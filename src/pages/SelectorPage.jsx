@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, CircleHelp, Info, ListChecks, RotateCcw, Sparkles } from "lucide-react";
 import CardImage from "../components/CardImage";
 import RunningStyleLogo from "../components/RunningStyleLogo";
 import CommunitySection from "../components/CommunitySection";
 import Footer from "../components/Footer";
+import SkillDetailModal from "../components/SkillDetailModal";
 import { readSitePreferences, subscribeSitePreferences } from "../lib/sitePreferences";
 import { findMatchingScenario, getScenarioRecommendations, LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, RUNNING_STYLES } from "../lib/scenarioEngine";
 import { buildRuleBasedRecommendations, combineUniversalAndStyleRecommendations, evaluateRecommendationItems } from "../lib/recommendationRules";
@@ -19,7 +20,9 @@ function sortCoreCards(cards) {
   return [...cards].sort((a, b) => (order.get(a.id) ?? 100) - (order.get(b.id) ?? 100));
 }
 
-function RecommendationPanel({ category, items, cardMap }) {
+function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) {
+  const [activeSkill, setActiveSkill] = useState(null);
+  const closeSkillModal = useCallback(() => setActiveSkill(null), []);
   return (
     <section className="result-category" key={category.id}>
       <div className="result-category-heading">
@@ -48,9 +51,29 @@ function RecommendationPanel({ category, items, cardMap }) {
               <article className={`recommendation-card recommendation-${status}`} key={`${category.id}-${item.cardId}-${index}`}>
                 <CardImage card={card} className="recommendation-card-image" />
                 <div className="recommendation-card-detail">
-                  <span className={`recommendation-status ${status}`}>{status === "recommended" ? "Recommended" : "Alternative"}</span>
-                  <h4>{card.name}</h4>
-                  <p>{card.type || "Support Card"}</p>
+                  <div className="recommendation-title-row">
+                    <h4>{card.name}</h4>
+                    <span className={`recommendation-status ${status}`}>{status === "recommended" ? "Recommended" : "Alternative"}</span>
+                  </div>
+                  <p className="recommendation-card-type">
+                    {card.type || "Support Card"}
+                    {item.minUsableLb !== null && item.minUsableLb !== undefined && item.minUsableLb !== "" && Number.isInteger(Number(item.minUsableLb)) && Number(item.minUsableLb) >= 0 && Number(item.minUsableLb) <= 4 && (
+                      <> <span className="recommendation-meta-separator">·</span> Minimum usable <strong className="recommendation-usable-lb">LB{Number(item.minUsableLb)}</strong></>
+                    )}
+                  </p>
+                  {Array.isArray(item.skills) && item.skills.length > 0 && (
+                    <div className="recommendation-skills" aria-label={`Skills for ${card.name}`}>
+                      <span>Skill{item.skills.length > 1 ? "s" : ""}: </span>
+                      {item.skills.map((skill, skillIndex) => {
+                        const skillId = String(skill?.id || "");
+                        const skillName = String(skill?.name || `Skill ${skillId}`);
+                        return <span className="recommendation-skill-entry" key={`${skillId}-${skillIndex}`}>
+                          {skillIndex > 0 && <span className="recommendation-skill-separator">, </span>}
+                          <button type="button" className="recommendation-skill-link" onClick={() => setActiveSkill({ id: skillId, name: skillName })}>{skillName}</button>
+                        </span>;
+                      })}
+                    </div>
+                  )}
                   {item.note && <p className="recommendation-note">{item.note}</p>}
                   {evaluation && (
                     <div className={`recommendation-evaluation tone-${evaluation.tone}`}>
@@ -67,6 +90,7 @@ function RecommendationPanel({ category, items, cardMap }) {
           })}
         </div>
       )}
+      {activeSkill && <SkillDetailModal skillId={activeSkill.id} fallbackName={activeSkill.name} activationExplanation={skillOverrides?.[activeSkill.id]?.activationExplanation} onClose={closeSkillModal} />}
     </section>
   );
 }
@@ -323,7 +347,7 @@ export default function SelectorPage({ config, loading }) {
           <>
             <div className="results-category-list">
               {recommendationGroups.map((group) => (
-                <RecommendationPanel key={group.id} category={group} items={group.items} cardMap={cardMap} />
+                <RecommendationPanel key={group.id} category={group} items={group.items} cardMap={cardMap} skillOverrides={config?.skillOverrides || {}} />
               ))}
             </div>
             {!selectedStyles.length && <p className="result-hint">Select one or more running styles to combine Universal recommendations with each selected style independently.</p>}
