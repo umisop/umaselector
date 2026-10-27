@@ -297,3 +297,21 @@
   .profile-recommendations-heading { align-items: flex-start; }
   .profile-recommendation-top { flex-direction: column; }
 }
+
+/* Password visibility and live password requirements in the auth modal */
+.community-password-wrap { position: relative; display: block; width: 100%; }
+.community-field .community-password-wrap input { width: 100%; padding-right: 44px; }
+.community-password-toggle { position: absolute; top: 50%; right: 5px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; transform: translateY(-50%); border: 1px solid transparent; border-radius: 3px; color: #8ba3aa; background: transparent; cursor: pointer; }
+.community-password-toggle:hover { color: #eaf6f7; background: #17272c; border-color: #2f4c53; }
+.community-password-toggle:focus-visible { outline: 2px solid #54e6ef; outline-offset: 1px; }
+.community-password-requirements { display: grid; gap: 7px; margin-top: 2px; padding: 10px 11px; border: 1px solid #243b41; background: #0a1317; }
+.community-password-requirements-title { color: #aec1c5; font-size: 10px; font-weight: 700; }
+.community-password-rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 10px; }
+.community-password-rule { display: flex; align-items: center; gap: 6px; min-width: 0; color: #82979d; font-size: 9px; line-height: 1.45; }
+.community-password-rule > svg { flex: 0 0 auto; color: #657b81; }
+.community-password-rule.is-met { color: #9fe8bc; }
+.community-password-rule.is-met > svg { color: #72d8a0; }
+.community-password-match { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; }
+.community-password-match.is-matched { color: #9fe8bc; }
+.community-password-match.is-mismatch { color: #ffc1c4; }
+@media (max-width: 420px) { .community-password-rules { grid-template-columns: minmax(0, 1fr); } }

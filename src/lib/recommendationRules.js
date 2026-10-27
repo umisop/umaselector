@@ -176,25 +176,16 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
       break;
     case "super-creek":
       if (currentLevel === -1) {
-        return result(
-          "info",
-          "Adds a usable card",
-          "Super Creek is already usable at LB0 according to your rule. This exchange would add it at LB0; it does not reach the LB3 initial-gauge improvement.",
-          "recommended",
-        );
+        return result("info", "Adds a usable card", "Super Creek is already usable at LB0. This exchange would add it at LB0; it does not reach the LB3 initial-gauge improvement.", "recommended");
       }
       if (currentLevel < 2) {
-        return result(
-          "info",
-          "Already usable below LB3",
-          `This exchange would bring Super Creek to ${levelLabel(nextLevel)}. LB0 is already usable; LB3 is the breakpoint you identified for improved initial gauge.`,
-        );
+        return result("info", "Already usable below LB3", `This exchange would bring Super Creek to ${levelLabel(nextLevel)}. LB0 is already usable; LB3 is very Good for improved initial gauge.`);
       }
       if (currentLevel === 2) {
-        return result("positive", "Initial-gauge upgrade", "This exchange reaches LB3, the level you identified for improved initial gauge.");
+        return result("positive", "Initial-gauge upgrade", "This exchange reaches LB3, this good for improved initial gauge.");
       }
       if (currentLevel === 3) {
-        return result("info", "Compare the next upgrade", "Super Creek already has the LB3 initial-gauge breakpoint. This exchange reaches LB4; weigh it against other targets.");
+        return result("info", "Compare the next upgrade", "Super Creek already has the LB3 initial-gauge. This exchange reaches LB4; weigh it against other targets.");
       }
       break;
     case "fine-motion":
@@ -203,7 +194,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
           return result(
             "warning",
             "Potentially low-value Wisdom exchange",
-            `The other five Core Cards are already LB4, while this exchange would bring Fine Motion only to ${levelLabel(nextLevel)}, below the preferred LB3 breakpoint. Fine Motion can still be used, but compare this with other targets. If your next scenario follows the one-Wisdom setup you described for Medium/Mile with Ramonu filling the slot, a stronger Wisdom card may take priority.`,
+            `The other five Core Cards are already LB4, while this exchange would bring Fine Motion only to ${levelLabel(nextLevel)}, below the preferred LB3 breakpoint. Fine Motion can still be used, but compare this with other targets. Next scenario after grandmaster use one-wit card setup, and for Medium/Mile Ramonu is Locked Wit Card, Only can use for Sprint/Long Races but a new stronger Wit card card may take priority.`,
           );
         }
         if (currentLevel === -1) {
@@ -220,12 +211,12 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         );
       }
       if (currentLevel === 2) {
-        return result("positive", "Good upgrade", "This exchange takes Fine Motion from LB2 to LB3, the stronger breakpoint you identified.");
+        return result("positive", "Good upgrade", "This exchange takes Fine Motion from LB2 to LB3. This Very Good Upgrade");
       }
       if (currentLevel === 3) {
         return result(
           "warning",
-          "Check the marginal Wisdom upgrade",
+          "Check the marginal Wit upgrade",
           "Fine Motion is already in its stronger LB3 range; this exchange would reach LB4. Compare the marginal value with other exchange targets before spending the exchange.",
         );
       }
@@ -243,11 +234,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
           return result("positive", "Reaches the required LB3", "This exchange brings Agnes Tachyon from LB2 to LB3, your required Pace Chaser target.");
         }
         if (currentLevel === 3) {
-          return result(
-            "info",
-            "LB3 requirement already met",
-            "Agnes Tachyon already meets your stated Pace Chaser target at LB3. This exchange would reach LB4; no additional LB4 requirement has been specified.",
-          );
+          return result("info", "LB3 requirement already met", "Agnes Tachyon already meets stated Pace Chaser target at LB3. Going LB4, make you get +2 sp bonus. Very Good Upgrade");
         }
       }
       break;
@@ -255,7 +242,11 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
       // Maruzensky's LB breakpoints remain useful whenever the card is shown,
       // including when it enters a selected style's group through Universal.
       if (currentLevel === -1) {
-        return result("warning", "Not usable yet after one exchange", "One exchange would bring Maruzensky to LB0. LB1 is usable for Front Runner, while LB3 is the strong target.");
+        return result(
+          "warning",
+          "Not usable yet after one exchange",
+          "One exchange would bring Maruzensky to LB0. LB1 is usable for Front Runner or other style for  stat gain, while LB3 is the strong target.",
+        );
       }
       if (currentLevel === 0) {
         return result("positive", "Reaches usable LB1", "This exchange brings Maruzensky to LB1, which is usable for Front Runner. LB3 remains the stronger target.");
@@ -271,7 +262,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         );
       }
       if (currentLevel === 3) {
-        return result("warning", "Small LB3 → LB4 improvement", "You specified that Maruzensky's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");
+        return result("warning", "Small LB3 → LB4 improvement", "Maruzensky's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");
       }
       break;
     case "mr-cb":
@@ -290,7 +281,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
           return result("warning", "Low-value LB1 → LB2 upgrade", "Wit CB's LB1 to LB2 step is not a strong upgrade. Consider saving this exchange toward LB3 or another target.");
         }
         if (currentLevel === 2) {
-          return result("positive", "Reaches good LB3 level", "This exchange brings Wit CB to LB3, which you identified as a good level for End Closer. LB3 is a good target, not a hard requirement.");
+          return result("positive", "Reaches good LB3 level", "This exchange brings Wit CB to LB3, which as a good level for End Closer. LB3 is a good target, not a hard requirement.");
         }
         if (currentLevel === 3) {
           return result("warning", "Small LB3 → LB4 improvement", "Wit CB's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");

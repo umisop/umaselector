@@ -68,7 +68,13 @@ where profile.id = auth_user.id
       and nullif(btrim(identity_field.field_value), '') is not null
   );
 
--- 3) Use an empty search_path in the SECURITY DEFINER feedback trigger function.
+-- 3) Explicitly enforce least-privilege table grants for private feedback.
+-- This mirrors the hardened site-info-and-feedback.sql for an existing deployment.
+alter table public.site_feedback enable row level security;
+revoke all privileges on table public.site_feedback from public, anon, authenticated;
+grant select, insert, update on table public.site_feedback to authenticated;
+
+-- 4) Use an empty search_path in the SECURITY DEFINER feedback trigger function.
 create or replace function public.enforce_site_feedback_rate_limit()
 returns trigger
 language plpgsql
@@ -96,7 +102,7 @@ begin
 end;
 $function$;
 
--- 4) Trigger-only SECURITY DEFINER functions should not be directly executable by API roles.
+-- 5) Trigger-only SECURITY DEFINER functions should not be directly executable by API roles.
 revoke all on function public.handle_new_community_user() from public, anon, authenticated;
 revoke all on function public.update_community_upvote_count() from public, anon, authenticated;
 revoke all on function public.validate_community_recommendation() from public, anon, authenticated;
@@ -106,7 +112,7 @@ revoke all on function public.refresh_community_scenario_assignments() from publ
 revoke all on function public.match_community_scenario(jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public.enforce_site_feedback_rate_limit() from public, anon, authenticated;
 
--- 5) Keep moderation as the only route for changing the hidden state.
+-- 6) Keep moderation as the only route for changing the hidden state.
 revoke update (is_hidden) on table public.community_recommendations from authenticated;
 revoke all on function public.admin_set_community_recommendation_hidden(uuid, boolean) from public, anon;
 grant execute on function public.admin_set_community_recommendation_hidden(uuid, boolean) to authenticated;
