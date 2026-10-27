@@ -27,7 +27,6 @@ begin
     nullif(btrim(new.raw_user_meta_data ->> 'preferred_username'), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'user_name'), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'username'), ''),
-    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
     ''
   )), 32);
 
@@ -80,7 +79,6 @@ cross join lateral (
     nullif(btrim(discord_identity.identity_data ->> 'preferred_username'), ''),
     nullif(btrim(discord_identity.identity_data ->> 'user_name'), ''),
     nullif(btrim(discord_identity.identity_data ->> 'username'), ''),
-    nullif(split_part(coalesce(u.email, ''), '@', 1), ''),
     ''
   )) as candidate_name
 ) as candidates
@@ -577,3 +575,16 @@ create policy "Admins can moderate community reports"
   on public.community_reports for update to authenticated
   using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
   with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+
+-- Keep trigger-only SECURITY DEFINER functions from being callable as RPCs.
+-- Triggers execute using the function owner; client roles do not need direct EXECUTE.
+revoke all on function public.handle_new_community_user() from public, anon, authenticated;
+revoke all on function public.update_community_upvote_count() from public, anon, authenticated;
+revoke all on function public.validate_community_recommendation() from public, anon, authenticated;
+revoke all on function public.enforce_community_post_rate_limit() from public, anon, authenticated;
+revoke all on function public.enforce_community_report_rate_limit() from public, anon, authenticated;
+revoke all on function public.refresh_community_scenario_assignments() from public, anon, authenticated;
+revoke all on function public.match_community_scenario(jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.admin_set_community_recommendation_hidden(uuid, boolean) from public, anon;
+grant execute on function public.admin_set_community_recommendation_hidden(uuid, boolean) to authenticated;

@@ -21,7 +21,6 @@ begin
     nullif(btrim(new.raw_user_meta_data ->> 'preferred_username'), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'user_name'), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'username'), ''),
-    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
     ''
   )), 32);
 
@@ -72,7 +71,6 @@ from (
       nullif(btrim(i.identity_data ->> 'preferred_username'), ''),
       nullif(btrim(i.identity_data ->> 'user_name'), ''),
       nullif(btrim(i.identity_data ->> 'username'), ''),
-      nullif(split_part(coalesce(u.email, ''), '@', 1), ''),
       ''
     )) as candidate_name
   ) as candidate

@@ -19,7 +19,7 @@ function sortCoreCards(cards) {
 
 function suggestedName(user) {
   const metadata = user?.user_metadata || {};
-  const candidates = [metadata.display_name, metadata.global_name, metadata.full_name, metadata.name, metadata.preferred_username, metadata.username, user?.email?.split('@')?.[0]];
+  const candidates = [metadata.display_name, metadata.global_name, metadata.full_name, metadata.name, metadata.preferred_username, metadata.username];
   for (const item of candidates) {
     const value = String(item || '').trim().replace(/\s+/g, ' ').slice(0, 32);
     if (value.length >= 2 && !['trainer', 'community member'].includes(value.toLowerCase())) return value;

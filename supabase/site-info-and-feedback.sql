@@ -19,7 +19,8 @@ create index if not exists site_feedback_user_id_created_at_idx
 
 alter table public.site_feedback enable row level security;
 
-revoke all on table public.site_feedback from anon, authenticated;
+-- Fail closed for all roles before granting signed-in functionality.
+revoke all privileges on table public.site_feedback from public, anon, authenticated;
 grant select, insert, update on table public.site_feedback to authenticated;
 
 drop policy if exists "Signed-in users can submit their own feedback" on public.site_feedback;
@@ -53,7 +54,7 @@ create or replace function public.enforce_site_feedback_rate_limit()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   recent_count integer;
@@ -64,7 +65,7 @@ begin
 
   select count(*)::integer
     into recent_count
-    from public.site_feedback f
+    from public.site_feedback as f
    where f.user_id = new.user_id
      and f.created_at > now() - interval '1 hour';
 
@@ -76,7 +77,7 @@ begin
 end;
 $$;
 
-revoke all on function public.enforce_site_feedback_rate_limit() from public;
+revoke all on function public.enforce_site_feedback_rate_limit() from public, anon, authenticated;
 drop trigger if exists site_feedback_rate_limit_before_insert on public.site_feedback;
 create trigger site_feedback_rate_limit_before_insert
 before insert on public.site_feedback

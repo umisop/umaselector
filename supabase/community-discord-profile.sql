@@ -18,7 +18,6 @@ begin
     nullif(btrim(new.raw_user_meta_data ->> 'name'), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'user_name'), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'preferred_username'), ''),
-    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
     ''
   ));
 
@@ -49,7 +48,6 @@ from (
       nullif(btrim(u.raw_user_meta_data ->> 'name'), ''),
       nullif(btrim(u.raw_user_meta_data ->> 'user_name'), ''),
       nullif(btrim(u.raw_user_meta_data ->> 'preferred_username'), ''),
-      nullif(split_part(coalesce(u.email, ''), '@', 1), ''),
       ''
     )), 32) as display_name
   from auth.users as u

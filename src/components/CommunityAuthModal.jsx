@@ -56,7 +56,7 @@ export default function CommunityAuthModal({ onClose, onAuthenticated, initialMo
         if (resetError) throw resetError;
         setMessage('If an account exists for this email, a password reset link has been sent. Please check your inbox.');
       } else if (mode === 'reset') {
-        if (password.length < 6) throw new Error('Your new password must be at least 6 characters long.');
+        if (password.length < 12) throw new Error('Your new password must be at least 12 characters long.');
         if (password !== confirmPassword) throw new Error('The password confirmation does not match.');
         const { error: updateError } = await supabase.auth.updateUser({ password });
         if (updateError) throw updateError;
@@ -67,6 +67,7 @@ export default function CommunityAuthModal({ onClose, onAuthenticated, initialMo
         setMessage('Your password has been updated. Sign in with your new password.');
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (mode === 'signup') {
+        if (password.length < 12) throw new Error('Your password must be at least 12 characters long.');
         const name = displayName.trim();
         if (name.length < 2 || name.length > 32) throw new Error('Display name must be between 2 and 32 characters.');
         const { data, error: authError } = await supabase.auth.signUp({
@@ -127,8 +128,8 @@ export default function CommunityAuthModal({ onClose, onAuthenticated, initialMo
         <form className="community-form" onSubmit={submit}>
           {mode === 'signup' && <label className="community-field">Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} minLength={2} maxLength={32} autoComplete="nickname" required placeholder="Your public display name" /></label>}
           {(mode === 'login' || mode === 'signup' || mode === 'forgot') && <label className="community-field">Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required placeholder="you@example.com" /></label>}
-          {(mode === 'login' || mode === 'signup' || mode === 'reset') && <label className="community-field">{mode === 'reset' ? 'New password' : 'Password'}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={6} required placeholder={mode === 'reset' ? 'At least 6 characters' : 'At least 6 characters'} /></label>}
-          {mode === 'reset' && <label className="community-field">Confirm new password<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" minLength={6} required placeholder="Enter the new password again" /></label>}
+          {(mode === 'login' || mode === 'signup' || mode === 'reset') && <label className="community-field">{mode === 'reset' ? 'New password' : 'Password'}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'signup' || mode === 'reset' ? 12 : undefined} required placeholder={mode === 'login' ? 'Enter your password' : 'At least 12 characters'} /></label>}
+          {mode === 'reset' && <label className="community-field">Confirm new password<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" minLength={12} required placeholder="Enter the new password again" /></label>}
           {error && <p className="community-form-error" role="alert">{error}</p>}
           {message && <p className="community-form-success" role="status">{message}</p>}
           <button className="community-button community-button-primary" type="submit" disabled={busy}>

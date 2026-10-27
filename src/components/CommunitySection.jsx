@@ -119,7 +119,6 @@ function suggestedDisplayName(user) {
     metadata.user_name,
     metadata.username,
     ...identityNames,
-    user?.email?.split("@")?.[0],
   ];
   for (const candidate of candidates) {
     const value = String(candidate || "")

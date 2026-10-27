@@ -5,7 +5,7 @@ export default function CardImage({ card, className = '', eager = false }) {
   const [failed, setFailed] = useState(false);
   const rawImageUrl = card?.imageUrl ?? card?.image_url ?? card?.img ?? '';
   const candidateUrl = typeof rawImageUrl === 'string' ? rawImageUrl.trim() : '';
-  const imageUrl = /^https?:\/\//i.test(candidateUrl) ? candidateUrl : '';
+  const imageUrl = /^https:\/\//i.test(candidateUrl) ? candidateUrl : '';
   const label = card?.name || 'Support Card';
 
   if (!imageUrl || failed) {
