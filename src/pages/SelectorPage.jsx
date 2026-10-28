@@ -7,7 +7,7 @@ import Footer from "../components/Footer";
 import SkillDetailModal from "../components/SkillDetailModal";
 import { readSitePreferences, subscribeSitePreferences } from "../lib/sitePreferences";
 import { findMatchingScenario, getScenarioRecommendations, LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, RUNNING_STYLES } from "../lib/scenarioEngine";
-import { buildRuleBasedRecommendations, combineUniversalAndStyleRecommendations, evaluateRecommendationItems } from "../lib/recommendationRules";
+import { buildRuleBasedRecommendations, combineUniversalAndStyleRecommendations, evaluateRecommendationItems, orderRecommendationsByStatus } from "../lib/recommendationRules";
 
 const CORE_ORDER = ["kitasan-black", "super-creek", "fine-motion", "agnes-tachyon", "maruzensky", "mr-cb"];
 
@@ -23,6 +23,9 @@ function sortCoreCards(cards) {
 function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) {
   const [activeSkill, setActiveSkill] = useState(null);
   const closeSkillModal = useCallback(() => setActiveSkill(null), []);
+  // Keep the creator's order within each status group, but always show
+  // Recommended entries before Alternatives in the public result list.
+  const orderedItems = orderRecommendationsByStatus(items);
   return (
     <section className="result-category" key={category.id}>
       <div className="result-category-heading">
@@ -41,7 +44,7 @@ function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) 
         </div>
       ) : (
         <div className="recommendation-cards">
-          {items.map((item, index) => {
+          {orderedItems.map((item, index) => {
             const card = cardMap.get(String(item.cardId));
             if (!card) return null;
             const status = item.status === "alternative" ? "alternative" : "recommended";

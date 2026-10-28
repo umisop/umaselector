@@ -1052,3 +1052,14 @@ input:focus, select:focus, textarea:focus { border-color: #54e6ef !important; ou
   .skill-picker-manual { grid-template-columns: minmax(0,1fr); }
   .skill-picker-manual .button-secondary { justify-content: center; }
 }
+
+
+/* Minimal fallback while a non-selector route chunk is loading. */
+.route-loading {
+  min-height: 40vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  color: var(--text-muted, #a7a4b8);
+  font-size: 0.9rem;
+}

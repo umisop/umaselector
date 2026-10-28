@@ -2,6 +2,18 @@ import { makeEmptyRecommendations, scenarioSpecificity, scenarioConditionPrecisi
 
 const CATEGORY_IDS = RECOMMENDATION_CATEGORIES.map((category) => category.id);
 
+/** Stable display ordering: Recommended first, Alternatives afterward. */
+export function orderRecommendationsByStatus(items) {
+  return (Array.isArray(items) ? items : [])
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => {
+      const aRank = a.item?.status === "alternative" ? 1 : 0;
+      const bRank = b.item?.status === "alternative" ? 1 : 0;
+      return aRank - bRank || a.originalIndex - b.originalIndex;
+    })
+    .map(({ item }) => item);
+}
+
 export function createEmptyRecommendationModel() {
   return {
     enabled: false,
@@ -164,14 +176,14 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         return result(
           "warning",
           "Below the LB3 target",
-          `This exchange would bring Kitasan Black to ${levelLabel(nextLevel)}, still below your preferred LB3 breakpoint. Consider how much you need this upgrade for the selected running style before spending an exchange.`,
+          `This exchange would bring Kitasan Black to ${levelLabel(nextLevel)}, still below LB3. Consider how much you need this upgrade for the selected running style before spending an exchange.`,
         );
       }
       if (currentLevel === 2) {
-        return result("positive", "Good upgrade", "This exchange reaches LB3, your stated strong target for Kitasan Black.");
+        return result("positive", "Good upgrade", "This exchange reaches LB3, strong target for Kitasan Black.");
       }
       if (currentLevel === 3) {
-        return result("positive", "Already at target LB3", "This exchange would reach LB4. LB3 is already your stated strong breakpoint, so compare the extra copy with other targets.");
+        return result("positive", "Already at target LB3", "This exchange would reach LB4. LB3 is already strong, so compare the extra copy with other targets.");
       }
       break;
     case "super-creek":
@@ -200,8 +212,8 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         if (currentLevel === -1) {
           return result(
             "warning",
-            "Does not reach the usable LB1 level",
-            "This exchange adds Fine Motion at LB0. You said LB1 is usable and LB3/LB4 are stronger, so this is still below the first usable breakpoint.",
+            "Does not reach the usable LB1",
+            "This exchange adds Fine Motion at LB0. LB1 is usable and LB3/LB4 are stronger, so this is still below the first usable breakpoint.",
           );
         }
         return result(
@@ -234,7 +246,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
           return result("positive", "Reaches the required LB3", "This exchange brings Agnes Tachyon from LB2 to LB3, your required Pace Chaser target.");
         }
         if (currentLevel === 3) {
-          return result("positive", "LB3 requirement already met", "But LB4 make this card good for SP gain, make you get +2 sp bonus. Very Good Upgrade");
+          return result("positive", "LB3 requirement already met", " But LB4 make this card good for SP gain, get +2 sp bonus. Very Good Upgrade");
         }
       }
       break;
@@ -245,21 +257,17 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         return result(
           "warning",
           "Not usable yet after one exchange",
-          "One exchange would bring Maruzensky to LB0. LB1 is usable for Front Runner or other style for  stat gain, while LB3 is the strong target.",
+          "One exchange would bring Maruzensky to LB0. LB1 is usable for Front Runner or other style for stat gain, while LB3 is the strong target.",
         );
       }
       if (currentLevel === 0) {
-        return result("positive", "Reaches usable LB1", "This exchange brings Maruzensky to LB1, which is usable for Front Runner. LB3 remains the stronger target.");
+        return result("positive", "Reaches usable LB1", "This exchange brings Maruzensky to LB1, which is usable for Front Runner or other style for stat gain. LB3 remains the stronger target.");
       }
       if (currentLevel === 1) {
-        return result("warning", "Low-value LB1 → LB2 upgrade", "You specified that Maruzensky's LB1 to LB2 performance increase is poor. Consider saving this exchange toward LB3 or another target.");
+        return result("warning", "Low-value LB1 → LB2 upgrade", "Maruzensky LB1 to LB2 performance increase is poor. Consider saving this exchange toward LB3 or another target.");
       }
       if (currentLevel === 2) {
-        return result(
-          "positive",
-          "Reaches the strong LB3 target",
-          "This exchange brings Maruzensky to LB3, a very valuable breakpoint in your strategy. This is a strong upgrade, not merely a generic Core Card exchange.",
-        );
+        return result("positive", "Reaches the strong LB3 target", "This exchange brings Maruzensky to LB3, a very valuable. This is a strong upgrade.");
       }
       if (currentLevel === 3) {
         return result("warning", "Small LB3 → LB4 improvement", "Maruzensky's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");
@@ -339,7 +347,7 @@ export function evaluateRecommendationItems(items, categoryId, viewerLevels, cor
     } else if (isWisdomCard(card)) {
       evaluation = {
         tone: "warning",
-        title: "Wit Card exchange check",
+        title: "Wisdom exchange check",
         message:
           "This is a Wit exchange. Using a selector on a Wit card is usually low value since after Grandmaster only uses one Wit slot, unless it’s just one copy away from its usable LB threshold.",
       };

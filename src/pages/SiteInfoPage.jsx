@@ -533,7 +533,7 @@ const PAGE_TITLES = {
 };
 
 const RETIRED_INFO_PATHS = ["/changelog", "/supporters"];
-export const SITE_INFO_PATHS = [...Object.keys(PAGE_CONTENT), ...RETIRED_INFO_PATHS];
+
 
 export default function SiteInfoPage({ path = window.location.pathname.replace(/\/$/, "") || "/" }) {
   const Content = PAGE_CONTENT[path] || AboutContent;

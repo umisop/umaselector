@@ -1,14 +1,22 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import Header from "./components/Header";
 import SelectorPage from "./pages/SelectorPage";
-import AdminPage from "./pages/AdminPage";
-import CommunityModerationPage from "./pages/CommunityModerationPage";
-import ProfilePage from "./pages/ProfilePage";
-import SiteInfoPage, { SITE_INFO_PATHS } from "./pages/SiteInfoPage";
 import { getPublicConfig } from "./lib/catalog";
-import { isSupabaseConfigured } from "./lib/supabase";
+import { isSupabaseConfigured } from "./lib/supabaseConfig";
+import { SITE_INFO_PATHS } from "./lib/siteInfoRoutes";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
 import "./styles.css";
+
+// Route-level code splitting keeps admin, profile, moderation, and legal pages
+// out of the initial selector bundle until the user opens them.
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+const CommunityModerationPage = lazy(() => import("./pages/CommunityModerationPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const SiteInfoPage = lazy(() => import("./pages/SiteInfoPage"));
+
+function RouteLoading() {
+  return <div className="route-loading" role="status" aria-live="polite">Loading page…</div>;
+}
 
 function AdminSetupRequired() {
   return (
@@ -57,22 +65,22 @@ export default function App() {
   }, [isAnyAdminRoute, isSiteInfoRoute]);
 
   if (isSiteInfoRoute) {
-    return <SiteInfoPage path={currentPath} />;
+    return <Suspense fallback={<RouteLoading />}><SiteInfoPage path={currentPath} /></Suspense>;
   }
 
   if (isProfileRoute) {
-    return <ProfilePage config={config} />;
+    return <Suspense fallback={<RouteLoading />}><ProfilePage config={config} /></Suspense>;
   }
 
   if (isCommunityModerationRoute) {
     if (import.meta.env.PROD && !isSupabaseConfigured) return <AdminSetupRequired />;
-    return <CommunityModerationPage />;
+    return <Suspense fallback={<RouteLoading />}><CommunityModerationPage /></Suspense>;
   }
 
   if (isAdminRoute) {
     // Local browser preview is allowed only during development. In production, fail closed.
     if (import.meta.env.PROD && !isSupabaseConfigured) return <AdminSetupRequired />;
-    return <AdminPage />;
+    return <Suspense fallback={<RouteLoading />}><AdminPage /></Suspense>;
   }
 
   return (

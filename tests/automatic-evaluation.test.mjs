@@ -31,8 +31,14 @@ function evaluate(base, viewerLevels, category) {
 // Core Card targets at LB4 are removed, while other catalog targets remain candidates.
 const maxedLevels = levels(Object.fromEntries(coreIds.map((id) => [id, 4])));
 const maxed = evaluate({ universal: [{ cardId: "kitasan-black" }, { cardId: nonCoreSpeed?.id }] }, maxedLevels, "universal");
-assert.equal(maxed.items.some((item) => item.cardId === "kitasan-black"), false);
-assert.equal(maxed.items.some((item) => item.cardId === nonCoreSpeed?.id), true);
+assert.equal(
+  maxed.items.some((item) => item.cardId === "kitasan-black"),
+  false,
+);
+assert.equal(
+  maxed.items.some((item) => item.cardId === nonCoreSpeed?.id),
+  true,
+);
 assert.equal(maxed.summary.skippedMaxedCoreCards.length, 1);
 
 // Kitasan Black target and Super Creek initial-gauge breakpoint.
@@ -104,7 +110,13 @@ assert.equal(cbMarginal.items[0].automaticEvaluation.tone, "warning");
 assert.equal(cbMarginal.items[0].status, "alternative", "Wit CB LB3 -> LB4 is dynamically marked Alternative");
 assert.match(cbMarginal.items[0].automaticEvaluation.title, /LB3 → LB4/);
 // CB and Maruzensky should share the same breakpoint tone sequence: unavailable -> usable -> poor marginal step -> good LB3 -> small LB4 gain.
-for (const [startingLevel, expectedTone] of [[-1, "warning"], [0, "positive"], [1, "warning"], [2, "positive"], [3, "warning"]]) {
+for (const [startingLevel, expectedTone] of [
+  [-1, "warning"],
+  [0, "positive"],
+  [1, "warning"],
+  [2, "positive"],
+  [3, "warning"],
+]) {
   const cbResult = evaluate({ ec: [{ cardId: "mr-cb" }] }, levels({ "mr-cb": startingLevel }), "ec");
   const maruResult = evaluate({ fr: [{ cardId: "maruzensky" }] }, levels({ maruzensky: startingLevel }), "fr");
   assert.equal(cbResult.items[0].automaticEvaluation.tone, expectedTone);
@@ -127,17 +139,20 @@ if (nonCoreSpeed) {
 
 // Universal is copied into each selected style group independently; style-specific entries override duplicates.
 const mergedPc = combineUniversalAndStyleRecommendations(
-  [{ cardId: "fine-motion", status: "alternative", note: "Universal note" }, { cardId: "kitasan-black", status: "recommended" }],
-  [{ cardId: "fine-motion", status: "recommended", note: "Pace Chaser note" }, { cardId: nonCoreSpeed?.id, status: "recommended" }],
+  [
+    { cardId: "fine-motion", status: "alternative", note: "Universal note" },
+    { cardId: "kitasan-black", status: "recommended" },
+  ],
+  [
+    { cardId: "fine-motion", status: "recommended", note: "Pace Chaser note" },
+    { cardId: nonCoreSpeed?.id, status: "recommended" },
+  ],
 );
 assert.equal(mergedPc.length, 3, "duplicate cards collapse within one style + universal group");
 assert.equal(mergedPc.find((item) => item.cardId === "fine-motion").status, "recommended", "style-specific status overrides the Universal status");
 assert.match(mergedPc.find((item) => item.cardId === "fine-motion").note, /Universal note/);
 assert.match(mergedPc.find((item) => item.cardId === "fine-motion").note, /Pace Chaser note/);
-const mergedLs = combineUniversalAndStyleRecommendations(
-  [{ cardId: "fine-motion", status: "alternative" }],
-  [{ cardId: nonCoreSpeed?.id, status: "recommended" }],
-);
+const mergedLs = combineUniversalAndStyleRecommendations([{ cardId: "fine-motion", status: "alternative" }], [{ cardId: nonCoreSpeed?.id, status: "recommended" }]);
 assert.equal(mergedLs.length, 2, "a second style gets its own independent Universal copy, not a combined multi-style list");
 
 console.log("Automatic evaluation and category-combination tests passed.");

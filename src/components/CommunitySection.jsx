@@ -110,16 +110,7 @@ function suggestedDisplayName(user) {
   const identityNames = (Array.isArray(user?.identities) ? user.identities : [])
     .map((identity) => identity?.identity_data || {})
     .flatMap((identity) => [identity.global_name, identity.full_name, identity.name, identity.preferred_username, identity.user_name, identity.username]);
-  const candidates = [
-    metadata.display_name,
-    metadata.global_name,
-    metadata.full_name,
-    metadata.name,
-    metadata.preferred_username,
-    metadata.user_name,
-    metadata.username,
-    ...identityNames,
-  ];
+  const candidates = [metadata.display_name, metadata.global_name, metadata.full_name, metadata.name, metadata.preferred_username, metadata.user_name, metadata.username, ...identityNames];
   for (const candidate of candidates) {
     const value = String(candidate || "")
       .trim()
@@ -640,7 +631,7 @@ export default function CommunitySection({ cards, coreCards, levels, allCoreFill
               </>
             ) : (
               <>
-                <h3>No Community recommendations for {matchedScenario.name} yet</h3>
+                <h3>No Community recommendations for these scenario yet</h3>
                 <p>
                   {selectedStyleIds.length
                     ? "No posts for this public scenario match the selected running styles yet."

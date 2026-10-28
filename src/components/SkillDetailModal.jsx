@@ -2,6 +2,31 @@ import { useEffect, useState } from "react";
 import { AlertCircle, ExternalLink, LoaderCircle, X, Zap } from "lucide-react";
 import { getSkillDetail } from "../lib/skillReference";
 
+
+const PUBLIC_SKILL_TYPES = new Set([
+  "Speed", "Acceleration", "Stamina", "Power", "Guts", "Wit", "Recovery",
+  "Debuff", "Passive", "Navigation", "Vision", "Start", "Other", "Scenario",
+]);
+function getVisibleSkillType(value, effect = "") {
+  const raw = String(value || "").trim();
+  const match = [...PUBLIC_SKILL_TYPES].find((type) => type.toLowerCase() === raw.toLowerCase());
+  if (match) return match;
+  // Do not expose GameTora's internal category identifiers (e.g. `cor nac` or
+  // `sho_l_2_l_3 mil`) in the UI. Infer a clean public label from its numeric effect.
+  const text = String(effect || "").toLowerCase();
+  if (/(target speed|current speed|lane speed|speed stat gain)/.test(text)) return "Speed";
+  if (/acceleration/.test(text)) return "Acceleration";
+  if (/stamina recovery/.test(text)) return "Recovery";
+  if (/stamina stat gain/.test(text)) return "Stamina";
+  if (/power stat gain/.test(text)) return "Power";
+  if (/guts stat gain/.test(text)) return "Guts";
+  if (/wit stat gain/.test(text)) return "Wit";
+  if (/(panic chance|panic duration|push chance|stamina drain rate|debuff)/.test(text)) return "Debuff";
+  if (/visibility up/.test(text)) return "Vision";
+  if (/start delay/.test(text)) return "Start";
+  return "";
+}
+
 function Meta({ label, children }) {
   if (children === undefined || children === null || children === "") return null;
   return <div className="skill-modal-meta"><span>{label}</span><strong>{children}</strong></div>;
@@ -36,14 +61,15 @@ export default function SkillDetailModal({ skillId, fallbackName, activationExpl
   if (!skillId) return null;
   const title = detail?.name || fallbackName || `Skill ${skillId}`;
   const condition = String(activationExplanation || "").trim() || detail?.activationSummary;
-  const sourceUrl = detail?.sourceUrl || `https://www.mihonostudios.com/database/skills/${encodeURIComponent(skillId)}`;
+  const sourceUrl = detail?.sourceUrl || `https://gametora.com/umamusume/skills`;
+  const visibleType = getVisibleSkillType(detail?.type, detail?.effect);
 
   return (
     <div className="skill-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="skill-modal" role="dialog" aria-modal="true" aria-labelledby="skill-modal-title">
         <header className="skill-modal-header">
           {detail?.iconUrl ? <img className="skill-modal-icon" src={detail.iconUrl} alt="" loading="lazy" referrerPolicy="strict-origin-when-cross-origin" /> : <span className="skill-modal-icon skill-modal-icon-fallback"><Zap size={22} /></span>}
-          <div className="skill-modal-heading"><h2 id="skill-modal-title">{title}</h2><p>{[detail?.type, detail?.rarity].filter(Boolean).join(" · ") || "Skill details"}</p></div>
+          <div className="skill-modal-heading"><h2 id="skill-modal-title">{title}</h2><p>{[visibleType, detail?.rarity].filter(Boolean).join(" · ") || "Skill details"}</p></div>
           <button className="skill-modal-close" type="button" aria-label="Close skill details" onClick={onClose}><X size={18} /></button>
         </header>
 
@@ -57,7 +83,7 @@ export default function SkillDetailModal({ skillId, fallbackName, activationExpl
           {!loading && <div className="skill-modal-meta-grid"><Meta label="Duration">{detail?.duration}</Meta><Meta label="SP cost">{detail?.spCost}</Meta><Meta label="Wit check">{detail?.witCheck}</Meta></div>}
           {!loading && detail?.technicalCondition && <div className="skill-modal-technical"><button type="button" aria-expanded={showTechnical} onClick={() => setShowTechnical((value) => !value)}>{showTechnical ? "Hide technical condition" : "Show technical condition"}<span>{showTechnical ? "−" : "+"}</span></button>{showTechnical && <code>{detail.technicalCondition}</code>}</div>}
         </div>
-        <footer className="skill-modal-footer"><span>Reference: Uma Musume Hub</span><a href={sourceUrl} target="_blank" rel="noopener noreferrer">Open source <ExternalLink size={13} /></a></footer>
+        <footer className="skill-modal-footer"><span>Reference: {detail?.sourceName || "GameTora"}</span><a href={sourceUrl} target="_blank" rel="noopener noreferrer">Open source <ExternalLink size={13} /></a></footer>
       </section>
     </div>
   );

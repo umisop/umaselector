@@ -1,7 +1,5 @@
-import { formatGameToraSkillEffect } from "../src/lib/skillReference.js";
+import { formatGameToraSkillEffect, normalizeGameToraSkillRecord } from "../src/lib/skillReference.js";
 
-const SOURCE_ORIGIN = "https://www.mihonostudios.com";
-const MAX_HTML_BYTES = 3_500_000;
 const GAMETORA_ORIGIN = "https://gametora.com";
 const MAX_GAMETORA_JSON_BYTES = 10_000_000;
 const GAMETORA_CACHE_TTL = 6 * 60 * 60 * 1000;
@@ -51,13 +49,20 @@ async function loadGameToraSkillIndex() {
         : [];
     if (!collection.length) throw new Error("GameTora skill data could not be parsed.");
     const byId = new Map();
-    // Keep all exact-name variants. A direct ID can exist in GameTora's
-    // localized metadata without carrying the numeric effect fields; when that
-    // happens, the exact-name variant may contain the raw effect record.
+    const recordsById = new Map();
+    // Keep every record that GameTora keys to the same numeric skill ID.
+    // Some raw/display records contain effects while a related record carries
+    // cost or duration metadata; detail normalization merges only same-ID rows.
     const byName = new Map();
     for (const [objectKey, record] of collection) {
       const recordId = record?.id ?? record?.skill_id ?? record?.skillId ?? objectKey;
-      if (recordId != null && /^\d{4,8}$/.test(String(recordId))) byId.set(String(recordId), record);
+      if (recordId != null && /^\d{4,8}$/.test(String(recordId))) {
+        const id = String(recordId);
+        byId.set(id, record);
+        const sameId = recordsById.get(id) || [];
+        if (!sameId.includes(record)) sameId.push(record);
+        recordsById.set(id, sameId);
+      }
       const names = [
         record?.name, record?.name_en, record?.nameEn, record?.en_name,
         record?.skill_name, record?.skill_name_en, record?.skillName,
@@ -77,8 +82,22 @@ async function loadGameToraSkillIndex() {
         }
       }
     }
-    if (!byId.size && !byName.size) throw new Error("GameTora skill data did not contain identifiable skills.");
-    gameToraSkillCache = { expiresAt: Date.now() + GAMETORA_CACHE_TTL, records: byId, names: byName };
+    // Select the most complete GameTora row for the catalog/effect endpoint,
+    // rather than letting a later sparse metadata row overwrite a full row.
+    for (const [id, sameIdRecords] of recordsById.entries()) {
+      let bestRecord = sameIdRecords[0];
+      let bestScore = -1;
+      for (const candidate of sameIdRecords) {
+        const score = skillRecordScore(normalizeGameToraSkillRecord(candidate, id));
+        if (score > bestScore) {
+          bestRecord = candidate;
+          bestScore = score;
+        }
+      }
+      if (bestRecord) byId.set(id, bestRecord);
+    }
+    if (!byId.size && !byName.size) throw new Error("GameTora skill data could not be parsed.");
+    gameToraSkillCache = { expiresAt: Date.now() + GAMETORA_CACHE_TTL, records: byId, recordsById, names: byName };
     return gameToraSkillCache;
   })();
   try {
@@ -106,7 +125,71 @@ async function handleGameToraEffect(req, id, res) {
   }
 }
 
-/** Same-origin, fixed-host proxy. Only numeric skill IDs are accepted (SSRF guard). */
+function skillRecordScore(detail) {
+  if (!detail) return -1;
+  return [
+    detail.name && !/^Skill ID /.test(detail.name), detail.description, detail.iconUrl,
+    detail.type, detail.rarity, detail.spCost, detail.duration,
+    detail.activationSummary, detail.technicalCondition, detail.effect, detail.witCheck,
+  ].filter(Boolean).length;
+}
+
+async function handleGameToraList(res) {
+  try {
+    const index = await loadGameToraSkillIndex();
+    const skills = [];
+    for (const [id, record] of index.records.entries()) {
+      const skill = normalizeGameToraSkillRecord(record, id);
+      if (!skill || !skill.name || /^Skill ID \d+$/.test(skill.name)) continue;
+      skills.push({
+        id: skill.id,
+        name: skill.name,
+        sourceUrl: skill.sourceUrl,
+        globalAvailable: skill.globalAvailable,
+        iconUrl: skill.iconUrl,
+        type: skill.type,
+        rarity: skill.rarity,
+      });
+    }
+    skills.sort((a, b) => a.name.localeCompare(b.name));
+    if (!skills.length) throw new Error("GameTora returned no named skills.");
+    return res.status(200).json({ sourceName: "GameTora", skills, count: skills.length });
+  } catch (error) {
+    return res.status(502).json({ error: error?.name === "AbortError" ? "GameTora skill list timed out. Try again." : "Unable to load the skill list from GameTora." });
+  }
+}
+
+async function handleGameToraDetail(req, id, res) {
+  try {
+    const index = await loadGameToraSkillIndex();
+    const requestedName = String(req.query?.name || "").trim();
+    const idRecord = index.records.get(String(id));
+    if (!idRecord) return res.status(404).json({ error: "The skill ID was not found in GameTora's dataset." });
+
+    // Use only GameTora records associated with this exact ID. Prefer the most
+    // complete normalized record, then fill missing fields from same-ID records.
+    // Never take metadata from a different skill that merely has a similar name.
+    const candidates = [...new Set([...(index.recordsById?.get(String(id)) || []), idRecord])];
+    const details = candidates
+      .map((record) => normalizeGameToraSkillRecord(record, id, requestedName))
+      .filter(Boolean)
+      .sort((a, b) => skillRecordScore(b) - skillRecordScore(a));
+    const detail = details[0] ? { ...details[0] } : null;
+    if (!detail) return res.status(404).json({ error: "GameTora did not provide details for this skill ID." });
+    for (const key of ["iconUrl", "description", "type", "rarity", "spCost", "duration", "activationSummary", "technicalCondition", "effect", "witCheck"]) {
+      if (detail[key] !== undefined && detail[key] !== null && detail[key] !== "") continue;
+      const alternative = details.find((candidate) => candidate[key] !== undefined && candidate[key] !== null && candidate[key] !== "");
+      if (alternative) detail[key] = alternative[key];
+    }
+    return res.status(200).json({ sourceName: "GameTora", detail });
+  } catch (error) {
+    return res.status(502).json({ error: error?.name === "AbortError" ? "GameTora skill details timed out. Try again." : "Unable to load skill details from GameTora." });
+  }
+}
+
+
+
+/** Same-origin, fixed-host proxy for GameTora's public skill data. */
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -117,42 +200,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const mode = typeof req.query?.mode === "string" ? req.query.mode : "detail";
+  const mode = typeof req.query?.mode === "string" ? req.query.mode : "gametora-detail";
   if (mode === "gametora-effect") {
     const id = String(req.query?.id || "");
     if (!/^\d{4,8}$/.test(id)) return res.status(400).json({ error: "A numeric skill ID is required." });
     return handleGameToraEffect(req, id, res);
   }
-  let sourceUrl;
-  if (mode === "list") sourceUrl = `${SOURCE_ORIGIN}/database/skills`;
-  else if (mode === "detail") {
+  if (mode === "gametora-list") return handleGameToraList(res);
+  if (mode === "gametora-detail") {
     const id = String(req.query?.id || "");
     if (!/^\d{4,8}$/.test(id)) return res.status(400).json({ error: "A numeric skill ID is required." });
-    sourceUrl = `${SOURCE_ORIGIN}/database/skills/${id}`;
-  } else return res.status(400).json({ error: "Unsupported mode." });
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8_000);
-    let upstream;
-    try {
-      upstream = await fetch(sourceUrl, {
-        method: "GET",
-        signal: controller.signal,
-        headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "UmaSelector-Skill-Reference/1.0 (+https://umaselector.vercel.app)" },
-      });
-    } finally { clearTimeout(timeout); }
-    let finalOrigin = "";
-    try { finalOrigin = new URL(upstream.url || sourceUrl).origin; } catch { /* Invalid upstream URL is rejected below. */ }
-    if (finalOrigin !== SOURCE_ORIGIN) return res.status(502).json({ error: "Skill reference redirected to an unsupported host." });
-    if (!upstream.ok) return res.status(502).json({ error: `Skill reference returned HTTP ${upstream.status}.`, sourceUrl });
-    if (!(upstream.headers.get("content-type") || "").toLowerCase().includes("text/html")) return res.status(502).json({ error: "Skill reference did not return an HTML page.", sourceUrl });
-    const declaredLength = Number(upstream.headers.get("content-length") || 0);
-    if (declaredLength > MAX_HTML_BYTES) return res.status(502).json({ error: "Skill reference response was too large.", sourceUrl });
-    const html = await upstream.text();
-    if (!html || html.length > MAX_HTML_BYTES) return res.status(502).json({ error: "Skill reference response was empty or too large.", sourceUrl });
-    return res.status(200).json({ html, sourceUrl, fetchedAt: new Date().toISOString() });
-  } catch (error) {
-    return res.status(502).json({ error: error?.name === "AbortError" ? "Skill reference timed out. Try again." : "Skill reference is temporarily unavailable." });
+    return handleGameToraDetail(req, id, res);
   }
+  return res.status(400).json({ error: "Unsupported mode." });
 }
