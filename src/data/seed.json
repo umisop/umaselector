@@ -45,8 +45,7 @@
       "coreDescription": {
         "style": "Universal",
         "usableFrom": "LB1 is usable",
-        "strengths": "Excellent Wit stat gain; stronger at LB3 & LB4.",
-        "notes": "Using a selector on a Wit card is usually low value since after Grandmaster only uses one Wit slot, unless it’s just one copy away from its usable LB threshold."
+        "strengths": "Excellent Wit stat gain; stronger at LB3 & LB4."
       }
     },
     {
@@ -76,7 +75,7 @@
       "coreDescription": {
         "style": "Front Runner-Semi Universal",
         "usableFrom": "LB1 is usable",
-        "strengths": "LB3 is Very Strong Card",
+        "strengths": "LB3 is Very Strong",
         "notes": "In other style use only for Stat Gain"
       }
     },

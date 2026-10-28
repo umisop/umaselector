@@ -77,7 +77,15 @@ function ensureConfig(value) {
     .filter(Boolean);
   const byId = new Map(oldCards.map((card) => [String(card.id), card]));
   const defaults = [
-    ...seedConfig.cards.filter((card) => card.isCore).map((card) => ({ ...card, ...(byId.get(String(card.id)) || {}), isCore: true })),
+    // Keep the six Core Card descriptions synchronized with src/data/seed.json.
+    // Supabase/local config remains authoritative for scenarios, recommendation rules,
+    // and other persisted fields, but cannot shadow source-controlled core descriptions.
+    ...seedConfig.cards.filter((card) => card.isCore).map((card) => ({
+      ...card,
+      ...(byId.get(String(card.id)) || {}),
+      isCore: true,
+      coreDescription: card.coreDescription,
+    })),
     ...seedConfig.cards.filter((card) => !card.isCore).map((card) => ({ ...card, ...(byId.get(String(card.id)) || {}), isCore: false })),
   ];
   const cards = [...defaults];

@@ -60,9 +60,17 @@ function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) 
                   </div>
                   <p className="recommendation-card-type">
                     {card.type || "Support Card"}
-                    {item.minUsableLb !== null && item.minUsableLb !== undefined && item.minUsableLb !== "" && Number.isInteger(Number(item.minUsableLb)) && Number(item.minUsableLb) >= 0 && Number(item.minUsableLb) <= 4 && (
-                      <> <span className="recommendation-meta-separator">·</span> Minimum usable <strong className="recommendation-usable-lb">LB{Number(item.minUsableLb)}</strong></>
-                    )}
+                    {item.minUsableLb !== null &&
+                      item.minUsableLb !== undefined &&
+                      item.minUsableLb !== "" &&
+                      Number.isInteger(Number(item.minUsableLb)) &&
+                      Number(item.minUsableLb) >= 0 &&
+                      Number(item.minUsableLb) <= 4 && (
+                        <>
+                          {" "}
+                          <span className="recommendation-meta-separator">·</span> Minimum usable <strong className="recommendation-usable-lb">LB{Number(item.minUsableLb)}</strong>
+                        </>
+                      )}
                   </p>
                   {Array.isArray(item.skills) && item.skills.length > 0 && (
                     <div className="recommendation-skills" aria-label={`Skills for ${card.name}`}>
@@ -70,10 +78,14 @@ function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) 
                       {item.skills.map((skill, skillIndex) => {
                         const skillId = String(skill?.id || "");
                         const skillName = String(skill?.name || `Skill ${skillId}`);
-                        return <span className="recommendation-skill-entry" key={`${skillId}-${skillIndex}`}>
-                          {skillIndex > 0 && <span className="recommendation-skill-separator">, </span>}
-                          <button type="button" className="recommendation-skill-link" onClick={() => setActiveSkill({ id: skillId, name: skillName })}>{skillName}</button>
-                        </span>;
+                        return (
+                          <span className="recommendation-skill-entry" key={`${skillId}-${skillIndex}`}>
+                            {skillIndex > 0 && <span className="recommendation-skill-separator">, </span>}
+                            <button type="button" className="recommendation-skill-link" onClick={() => setActiveSkill({ id: skillId, name: skillName })}>
+                              {skillName}
+                            </button>
+                          </span>
+                        );
                       })}
                     </div>
                   )}
@@ -93,7 +105,9 @@ function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) 
           })}
         </div>
       )}
-      {activeSkill && <SkillDetailModal skillId={activeSkill.id} fallbackName={activeSkill.name} activationExplanation={skillOverrides?.[activeSkill.id]?.activationExplanation} onClose={closeSkillModal} />}
+      {activeSkill && (
+        <SkillDetailModal skillId={activeSkill.id} fallbackName={activeSkill.name} activationExplanation={skillOverrides?.[activeSkill.id]?.activationExplanation} onClose={closeSkillModal} />
+      )}
     </section>
   );
 }
@@ -289,7 +303,7 @@ export default function SelectorPage({ config, loading }) {
                   </p>
                   <p>
                     <span>Notes</span>
-                    <strong>{card.coreDescription?.notes || "-"}</strong>
+                    <strong className="core-card-note-text">{card.coreDescription?.notes || "-"}</strong>
                   </p>
                 </div>
                 <label className="level-control core-level-control">

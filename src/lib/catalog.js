@@ -18,7 +18,15 @@ function normalizeConfig(config) {
   const coreDefaults = seedConfig.cards.filter((card) => card.isCore);
   const catalogDefaults = seedConfig.cards.filter((card) => !card.isCore);
   const cards = [
-    ...coreDefaults.map((card) => ({ ...card, ...(incomingById.get(String(card.id)) || {}), isCore: true })),
+    // Core Card descriptions are source-controlled in seed.json. Persisted Supabase/local
+    // configuration still controls recommendations and other card fields, but stale copies
+    // of coreDescription must not mask edits made to the seed file.
+    ...coreDefaults.map((card) => ({
+      ...card,
+      ...(incomingById.get(String(card.id)) || {}),
+      isCore: true,
+      coreDescription: card.coreDescription,
+    })),
     ...catalogDefaults.map((card) => ({ ...card, ...(incomingById.get(String(card.id)) || {}), isCore: false })),
   ];
   incomingCards.forEach((card) => {
