@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, CircleHelp, Info, ListChecks, RotateCcw, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, CircleHelp, GitCompare, Info, ListChecks, RotateCcw, Sparkles } from "lucide-react";
 import CardImage from "../components/CardImage";
 import RunningStyleLogo from "../components/RunningStyleLogo";
 import CommunitySection from "../components/CommunitySection";
 import Footer from "../components/Footer";
 import SkillDetailModal from "../components/SkillDetailModal";
+import CompareCardsModal from "../components/CompareCardsModal";
 import { readSitePreferences, subscribeSitePreferences } from "../lib/sitePreferences";
 import { findMatchingScenario, getScenarioRecommendations, LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, RUNNING_STYLES } from "../lib/scenarioEngine";
 import { buildRuleBasedRecommendations, combineUniversalAndStyleRecommendations, evaluateRecommendationItems, orderRecommendationsByStatus } from "../lib/recommendationRules";
@@ -114,6 +115,7 @@ function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) 
 
 export default function SelectorPage({ config, loading }) {
   const [selectedStyles, setSelectedStyles] = useState([]);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [sitePreferences, setSitePreferences] = useState(() => readSitePreferences());
   useEffect(() => subscribeSitePreferences(setSitePreferences), []);
   const [levels, setLevels] = useState({});
@@ -164,6 +166,36 @@ export default function SelectorPage({ config, loading }) {
       };
     });
   }, [matchedScenario, selectedStyles]);
+
+  const compareInitialSlots = useMemo(() => {
+    const candidates = [];
+    let sourceOrder = 0;
+    recommendationGroups.forEach((group) => {
+      (group.items || []).forEach((item) => {
+        const card = cardMap.get(String(item.cardId));
+        if (card) candidates.push({ card, item, sourceOrder: sourceOrder++ });
+      });
+    });
+    candidates.sort((a, b) => {
+      const rank = (entry) => (entry.item.status === "alternative" ? 1 : 0);
+      return rank(a) - rank(b) || a.sourceOrder - b.sourceOrder;
+    });
+    const seen = new Set();
+    return candidates
+      .filter(({ card }) => {
+        const id = String(card.gameCardId || card.id || "");
+        if (!/^\d{4,8}$/.test(id) || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .slice(0, 6)
+      .map(({ card, item }) => {
+        const hasUsableLb = item.minUsableLb !== null && item.minUsableLb !== undefined && item.minUsableLb !== "";
+        const rawLb = hasUsableLb ? Number(item.minUsableLb) : NaN;
+        const lb = Number.isInteger(rawLb) && rawLb >= 0 && rawLb <= 4 ? rawLb : 4;
+        return { id: String(card.gameCardId || card.id), lb };
+      });
+  }, [recommendationGroups, cardMap]);
 
   function toggleStyle(styleId) {
     setSelectedStyles((current) => (current.includes(styleId) ? current.filter((item) => item !== styleId) : [...current, styleId]));
@@ -368,6 +400,20 @@ export default function SelectorPage({ config, loading }) {
               ))}
             </div>
             {!selectedStyles.length && <p className="result-hint">Select one or more running styles to combine Universal recommendations with each selected style independently.</p>}
+            {recommendationGroups.some((group) => (group.items || []).length > 0) && (
+              <section className="compare-callout" aria-label="Compare support cards">
+                <div className="compare-callout-icon">
+                  <GitCompare size={19} />
+                </div>
+                <div className="compare-callout-copy">
+                  <h3>Still unsure which cards to exchange?</h3>
+                  <p>Compare the training results of your top recommendations</p>
+                </div>
+                <button type="button" className="compare-callout-button" onClick={() => setCompareOpen(true)}>
+                  <GitCompare size={15} /> Compare Cards
+                </button>
+              </section>
+            )}
           </>
         )}
       </section>
@@ -375,6 +421,7 @@ export default function SelectorPage({ config, loading }) {
       <CommunitySection cards={cards} coreCards={coreCards} levels={levels} allCoreFilled={allCoreFilled} matchedScenario={legacyMatchedScenario} selectedStyles={selectedStyles} />
 
       <Footer />
+      {compareOpen && <CompareCardsModal initialSlots={compareInitialSlots} onClose={() => setCompareOpen(false)} />}
     </main>
   );
 }

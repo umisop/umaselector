@@ -82,7 +82,10 @@ function FAQContent() {
       "Why is my post hidden?",
       "A moderator may hide a post after reviewing a report or for another moderation reason. Use the Feedback page to ask about an account or content issue. Never share your password or sign-in codes.",
     ],
-    ["Why is the featured video not loading?", "The featured YouTube video is optional. Open Cookie settings and allow the video if you want to watch it."],
+    [
+      "Why is the featured video not loading?",
+      "The featured YouTube video loads by default for new visitors using YouTube’s privacy-enhanced player. If you previously blocked it on this browser, open Cookie settings and turn it back on.",
+    ],
   ];
   return (
     <>
@@ -300,7 +303,8 @@ function PrivacyContent() {
             <strong>Feedback:</strong> when you send feedback, the site stores your message and its category along with your account so the site owner can review it and respond if needed.
           </li>
           <li>
-            <strong>Information saved in your browser:</strong> the site remembers that you are signed in and whether you have allowed the optional video to load.
+            <strong>Information saved in your browser:</strong> the site remembers that you are signed in and whether you have blocked the featured video. New visitors have the video enabled by
+            default.
           </li>
         </ul>
       </InfoSection>
@@ -318,9 +322,8 @@ function PrivacyContent() {
       </InfoSection>
       <InfoSection title="Who helps run the site?">
         <p>
-          The site uses outside service providers to keep accounts and Community information working. If you sign in with Discord, Discord is involved in confirming your identity. If you allow the
-          embedded YouTube video to load, YouTube may receive information about that visit. These providers handle information under their own privacy policies. You can decline the optional video in
-          Cookie settings.
+          The site uses outside service providers to keep accounts and Community information working. If you sign in with Discord, Discord is involved in confirming your identity. The featured video
+          loads by default through YouTube’s privacy-enhanced player. You can block the video in Cookie settings.
         </p>
       </InfoSection>
       <InfoSection title="Your choices and requests">
@@ -364,7 +367,12 @@ function CookieSettingsContent() {
   }
   return (
     <>
-      <InfoTitle kicker="YOUR CHOICES" title="Cookie settings" description="Choose whether the optional YouTube video can load on this device." icon={Cookie} />
+      <InfoTitle
+        kicker="YOUR CHOICES"
+        title="Cookie settings"
+        description="The featured YouTube video is enabled by default for new visitors. You can block or re-enable it on this device."
+        icon={Cookie}
+      />
       <div className="site-info-preference-list">
         <div className="site-info-preference">
           <div>
@@ -376,7 +384,10 @@ function CookieSettingsContent() {
         <div className="site-info-preference">
           <div>
             <strong>YouTube video</strong>
-            <p>If allowed, the featured video can load from YouTube. YouTube may receive information about your visit when the video loads. If blocked, the video will not load.</p>
+            <p>
+              The featured video uses YouTube’s privacy-enhanced player and loads by default for new visitors. YouTube may receive information about your visit when the player loads, and playing the
+              video may allow cookies. If blocked, the video will not load.
+            </p>
           </div>
           <label className="site-info-switch">
             <input
@@ -533,7 +544,6 @@ const PAGE_TITLES = {
 };
 
 const RETIRED_INFO_PATHS = ["/changelog", "/supporters"];
-
 
 export default function SiteInfoPage({ path = window.location.pathname.replace(/\/$/, "") || "/" }) {
   const Content = PAGE_CONTENT[path] || AboutContent;

@@ -1,11 +1,15 @@
 const STORAGE_KEY = 'card-exchange-selector-site-preferences-v1';
-const DEFAULT_PREFERENCES = Object.freeze({ externalMedia: false });
+// Load the featured video by default for new visitors; honor an explicit saved opt-out.
+const DEFAULT_PREFERENCES = Object.freeze({ externalMedia: true });
 
 export function readSitePreferences() {
   if (typeof window === 'undefined') return { ...DEFAULT_PREFERENCES };
   try {
-    const value = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
-    return { externalMedia: value.externalMedia === true };
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === null) return { ...DEFAULT_PREFERENCES };
+    const value = JSON.parse(stored);
+    // Preserve visitors' explicit choice, including externalMedia: false.
+    return { externalMedia: typeof value.externalMedia === 'boolean' ? value.externalMedia : DEFAULT_PREFERENCES.externalMedia };
   } catch {
     return { ...DEFAULT_PREFERENCES };
   }

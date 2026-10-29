@@ -267,7 +267,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
         return result("warning", "Low-value LB1 → LB2 upgrade", "Maruzensky LB1 to LB2 performance increase is poor. Consider saving this exchange toward LB3 or another target.");
       }
       if (currentLevel === 2) {
-        return result("positive", "Reaches the strong LB3 target", "This exchange brings Maruzensky to LB3, a very valuable. This is a strong upgrade.");
+        return result("positive", "Reaches the strong LB3 target", "This exchange brings Maruzensky to LB3, reaching a very valuable breakpoint. This is a strong upgrade.");
       }
       if (currentLevel === 3) {
         return result("warning", "Small LB3 → LB4 improvement", "Maruzensky's LB3 to LB4 improvement is not significant. Compare other exchange targets first.");
@@ -279,7 +279,7 @@ function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreC
           return result("warning", "Not usable yet after one exchange", "One exchange would bring Wit CB to LB0. usable threshold for End Closer is LB1, so another copy  still be needed.");
         }
         if (currentLevel === 0) {
-          return result("positive", "Reaches usable LB1", "This exchange brings Wit CB to LB1, which is already usable for End Closer. LB3 is a good target");
+          return result("positive", "Reaches usable LB1", "This exchange brings Wit CB to LB1, which is already usable for End Closer. LB3 is a good target, not a requirement.");
         }
         if (currentLevel === 1) {
           return result("warning", "Low-value LB1 → LB2 upgrade", "Wit CB's LB1 to LB2 step is not a strong upgrade. Consider saving this exchange toward LB3 or another target.");

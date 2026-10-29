@@ -20,9 +20,15 @@ async function fetchGameToraJson(url, timeoutMs = 10_000) {
       signal: controller.signal,
       headers: { Accept: "application/json", "User-Agent": "UmaSelector-Skill-Reference/1.0 (+https://umaselector.vercel.app)" },
     });
-  } finally { clearTimeout(timeout); }
+  } finally {
+    clearTimeout(timeout);
+  }
   let finalUrl;
-  try { finalUrl = new URL(response.url || url); } catch { throw new Error("Invalid GameTora response URL."); }
+  try {
+    finalUrl = new URL(response.url || url);
+  } catch {
+    throw new Error("Invalid GameTora response URL.");
+  }
   if (finalUrl.origin !== GAMETORA_ORIGIN) throw new Error("GameTora redirected to an unsupported host.");
   if (!response.ok) throw new Error(`GameTora returned HTTP ${response.status}.`);
   if (!(response.headers.get("content-type") || "").toLowerCase().includes("json")) throw new Error("GameTora did not return JSON data.");
@@ -63,17 +69,13 @@ async function loadGameToraSkillIndex() {
         if (!sameId.includes(record)) sameId.push(record);
         recordsById.set(id, sameId);
       }
-      const names = [
-        record?.name, record?.name_en, record?.nameEn, record?.en_name,
-        record?.skill_name, record?.skill_name_en, record?.skillName,
-        record?.display_name, record?.displayName,
-      ];
+      const names = [record?.name, record?.name_en, record?.nameEn, record?.en_name, record?.skill_name, record?.skill_name_en, record?.skillName, record?.display_name, record?.displayName];
       for (const nameValue of names) {
-        const candidates = nameValue && typeof nameValue === "object"
-          ? [nameValue.en, nameValue.global, nameValue.english, nameValue.name_en]
-          : [nameValue];
+        const candidates = nameValue && typeof nameValue === "object" ? [nameValue.en, nameValue.global, nameValue.english, nameValue.name_en] : [nameValue];
         for (const name of candidates) {
-          const normalizedName = String(name || "").trim().toLocaleLowerCase();
+          const normalizedName = String(name || "")
+            .trim()
+            .toLocaleLowerCase();
           if (normalizedName && normalizedName.length <= 120) {
             const variants = byName.get(normalizedName) || [];
             if (!variants.includes(record)) variants.push(record);
@@ -110,9 +112,11 @@ async function loadGameToraSkillIndex() {
 async function handleGameToraEffect(req, id, res) {
   try {
     const index = await loadGameToraSkillIndex();
-    const requestedName = String(req.query?.name || "").trim().toLocaleLowerCase();
+    const requestedName = String(req.query?.name || "")
+      .trim()
+      .toLocaleLowerCase();
     const idRecord = index.records.get(String(id));
-    const nameRecords = requestedName ? (index.names.get(requestedName) || []) : [];
+    const nameRecords = requestedName ? index.names.get(requestedName) || [] : [];
     const candidates = [...new Set([...(idRecord ? [idRecord] : []), ...nameRecords])];
     let effect = "";
     for (const candidate of candidates) {
@@ -128,9 +132,17 @@ async function handleGameToraEffect(req, id, res) {
 function skillRecordScore(detail) {
   if (!detail) return -1;
   return [
-    detail.name && !/^Skill ID /.test(detail.name), detail.description, detail.iconUrl,
-    detail.type, detail.rarity, detail.spCost, detail.duration,
-    detail.activationSummary, detail.technicalCondition, detail.effect, detail.witCheck,
+    detail.name && !/^Skill ID /.test(detail.name),
+    detail.description,
+    detail.iconUrl,
+    detail.type,
+    detail.rarity,
+    detail.spCost,
+    detail.duration,
+    detail.activationSummary,
+    detail.technicalCondition,
+    detail.effect,
+    detail.witCheck,
   ].filter(Boolean).length;
 }
 
@@ -186,8 +198,6 @@ async function handleGameToraDetail(req, id, res) {
     return res.status(502).json({ error: error?.name === "AbortError" ? "GameTora skill details timed out. Try again." : "Unable to load skill details from GameTora." });
   }
 }
-
-
 
 /** Same-origin, fixed-host proxy for GameTora's public skill data. */
 export default async function handler(req, res) {

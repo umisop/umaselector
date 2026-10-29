@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import skillReferenceHandler from './api/skill-reference.js';
+import supportCardCompareHandler from './api/support-card-compare.js';
 
 /**
  * Vercel serves files in /api as serverless functions, but plain `vite`
@@ -49,6 +50,27 @@ function localSkillReferenceApi() {
   };
 }
 
+
+function localSupportCardCompareApi() {
+  return {
+    name: 'local-support-card-compare-api',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        let requestUrl;
+        try { requestUrl = new URL(req.url || '/', 'http://localhost'); } catch { return next(); }
+        if (requestUrl.pathname !== '/api/support-card-compare') return next();
+        req.query = Object.fromEntries(requestUrl.searchParams.entries());
+        const response = {
+          setHeader(name, value) { res.setHeader(name, value); return this; },
+          status(code) { res.statusCode = code; return this; },
+          json(payload) { if (!res.headersSent) res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.end(JSON.stringify(payload)); return this; },
+        };
+        try { await supportCardCompareHandler(req, response); } catch (error) { next(error); }
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), localSkillReferenceApi()],
+  plugins: [react(), localSkillReferenceApi(), localSupportCardCompareApi()],
 });

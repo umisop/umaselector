@@ -622,9 +622,7 @@ export default function CommunitySection({ cards, coreCards, levels, allCoreFill
             ) : !matchedScenario?.id ? (
               <>
                 <h3>No Community recommendations for these Core Card levels yet</h3>
-                <p>
-                  You can still share a recommendation for this exact six-card combination. Once the creator configures a matching public scenario, the post will be associated with it automatically.
-                </p>
+                <p>You can still share a recommendation for this exact six-card combination.</p>
                 <button type="button" className="community-button community-button-muted" onClick={openCreate}>
                   <Plus size={15} /> Share the first recommendation
                 </button>
