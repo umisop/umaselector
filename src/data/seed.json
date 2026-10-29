@@ -44,8 +44,8 @@
       "gameToraUrl": "https://gametora.com/umamusume/supports/30010-fine-motion",
       "coreDescription": {
         "style": "Universal",
-        "usableFrom": "LB1 is usable",
-        "strengths": "Excellent Wit stat gain; stronger at LB3 & LB4."
+        "usableFrom": "LB1 is copiumable",
+        "strengths": "Excellent Wit stat gain at LB3 & LB4."
       }
     },
     {
@@ -58,9 +58,10 @@
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30101.png",
       "gameToraUrl": "https://gametora.com/umamusume/supports/30101-agnes-tachyon",
       "coreDescription": {
-        "style": "Pace Chaser",
+        "style": "Pace Chaser - Semi Universal",
         "usableFrom": "LB3 required",
-        "strengths": "Core Pace Chaser card; aim for LB3."
+        "strengths": "Core Pace Chaser card; aim for LB3.",
+        "notes": "For other style use only for SP and Stat Gain"
       }
     },
     {
@@ -73,10 +74,10 @@
       "imageUrl": "https://media.gametora.com/umamusume/supports/full/small/30107.png",
       "gameToraUrl": "https://gametora.com/umamusume/supports/30107-maruzensky",
       "coreDescription": {
-        "style": "Front Runner-Semi Universal",
+        "style": "Front Runner - Semi Universal",
         "usableFrom": "LB1 is usable",
-        "strengths": "LB3 is Very Strong",
-        "notes": "In other style use only for Stat Gain"
+        "strengths": "Core Front Runner Card; aim for LB3 for better performance",
+        "notes": "For other style use only for Stat Gain"
       }
     },
     {

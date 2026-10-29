@@ -157,12 +157,16 @@ export default function SelectorPage({ config, loading }) {
       ];
     }
     return selectedStyleDefinitions.map((style) => {
+      const styleItems = getScenarioRecommendations(matchedScenario, style.id);
+
+      const mergedItems = combineUniversalAndStyleRecommendations(universalItems, styleItems);
+
       return {
         id: `${style.id}-with-universal`,
         styleId: style.id,
         label: style.label,
         description: `Recommendations for ${style.label}.`,
-        items: combineUniversalAndStyleRecommendations(universalItems, getScenarioRecommendations(matchedScenario, style.id)),
+        items: mergedItems,
       };
     });
   }, [matchedScenario, selectedStyles]);
