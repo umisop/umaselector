@@ -165,9 +165,59 @@ function levelLabel(level) {
   return LEVEL_LABELS[String(level)] || `LB${level}`;
 }
 
-function isWisdomCard(card) {
+export function isWisdomCard(card) {
   const type = String(card?.type || "").toLowerCase();
   return type === "wit" || type.includes("wisdom");
+}
+
+/**
+ * Generate a live breakpoint note for non-Core cards using the admin-configured
+ * Minimum usable LB. Wisdom cards keep their existing Wit-specific guidance;
+ * Core Cards keep their more detailed card-specific evaluations below.
+ * currentLevel is the level before the next planned exchange (-1 = not owned).
+ */
+export function evaluateMinimumUsableBreakpoint(card, currentLevel, minUsableLb) {
+  if (isWisdomCard(card)) return null;
+  if (currentLevel === null || currentLevel === undefined || currentLevel === "") return null;
+  if (minUsableLb === null || minUsableLb === undefined || minUsableLb === "") return null;
+  const level = Number(currentLevel);
+  const target = Number(minUsableLb);
+  if (!Number.isInteger(level) || level < -1 || level >= 4) return null;
+  if (!Number.isInteger(target) || target < 0 || target > 4) return null;
+
+  const nextLevel = level === -1 ? 0 : level + 1;
+  const label = (value) => LEVEL_LABELS[String(value)] || `LB${value}`;
+  const result = (tone, title, message) => ({
+    tone,
+    title,
+    message,
+    recommendationStatus: tone === "positive" ? "recommended" : "alternative",
+    currentLevel: level,
+    resultingLevel: nextLevel,
+    minimumUsableLb: target,
+  });
+
+  if (level < target && nextLevel < target) {
+    return result(
+      "warning",
+      `Below usable LB${target}`,
+      `This exchange takes ${card?.name || "this card"} to ${label(nextLevel)}, still below its minimum usable LB${target}. Consider other exchange targets unless you plan to invest enough selectors to reach LB${target}.`,
+    );
+  }
+
+  if (level < target && nextLevel >= target) {
+    return result(
+      "positive",
+      `Good choice · Reaches usable LB${target}`,
+      `Good choice. This exchange takes ${card?.name || "this card"} from ${label(level)} to ${label(nextLevel)}, reaching its minimum usable LB${target}.`,
+    );
+  }
+
+  return result(
+    "info",
+    `Already usable at ${label(level)}`,
+    `${card?.name || "This card"} already meets its minimum usable LB${target}. This exchange would raise it to ${label(nextLevel)}; compare the marginal upgrade with other exchange targets before spending another selector.`,
+  );
 }
 
 function automaticEvaluation(card, categoryId, currentLevel, viewerLevels, coreCards) {

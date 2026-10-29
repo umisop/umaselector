@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const source = await readFile(new URL("../src/pages/SelectorPage.jsx", import.meta.url), "utf8");
+assert.match(source, /<RedeemPlanner/, "the recommendation area uses the interactive planner");
+assert.match(source, /onRedeem=\{addRedeem\}/, "Redeem action is wired to planner state");
+assert.match(source, /onRemoveExchange=\{removeRedeem\}/, "planned exchanges can be removed");
+assert.match(source, /planningLevels, coreCards/, "recommendation rule matching uses simulated post-exchange levels");
+assert.match(source, /item\?\.automaticEvaluation \|\| candidate\.automaticEvaluation/, "breakpoint evaluation is read from the current recommendation item");
+assert.match(source, /Minimum usable/, "candidate rows preserve minimum-usable-LB metadata");
+assert.match(source, /redeem-candidate-skills/, "candidate rows preserve configured skill metadata");
+assert.match(source, /redeem-candidate-rule-note/, "candidate rows preserve creator-authored notes");
+assert.match(source, /SkillDetailModal/, "skills in planner recommendations can open their detail modal");
+assert.match(source, /onCandidateLevelChange=\{changeCandidateLevel\}/, "non-Core cards require an initial level before exchange");
+assert.match(source, /<select value=\{candidate\.currentLevel \?\? ""\} onChange=\{\(event\) => onCandidateLevelChange\(card\.id, event\.target\.value\)\}/, "Current level selector reflects the projected level after planned redeems");
+assert.match(source, /getStartingLevelForProjectedLevel\(projectedLevel, plannedRedeemCount\)/, "changing the projected level rebases the starting level so existing exchanges are not counted twice");
+assert.match(source, /getMinimumProjectedLevel\(candidate\.redeemedCount\)/, "level choices below the current planned exchange sequence are not offered");
+assert.match(source, /findCompatibleTicketPool\(card, ticketCounts, redeemPlan\)/, "each exchange consumes a compatible remaining ticket pool");
+assert.match(source, /evaluateMinimumUsableBreakpoint\(card, currentLevel, reevaluated\.minUsableLb \?\? item\.minUsableLb\)/, "non-Core candidates evaluate their admin-defined usability threshold against their live simulated level");
+assert.match(source, /status: usableBreakpointEvaluation\.recommendationStatus/, "breakpoint tone updates the candidate's recommended/alternative badge");
+console.log("Redeem planner UI wiring tests passed.");

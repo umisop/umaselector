@@ -149,17 +149,20 @@ function CommunityRecommendationCard({ post, items, cardMap, coreCards, user, on
           </span>
           <span>{post.authorName}</span>
         </div>
-        <details className="community-snapshot">
-          <summary>Core-card inventory at submission</summary>
+        <section className="community-snapshot" aria-label="Core card inventory at submission">
+          <div className="community-snapshot-heading">Core cards at submission</div>
           <div className="community-snapshot-grid">
             {coreCards.map((card) => (
-              <span key={card.id}>
-                <small>{card.name}</small>
-                <strong>{formatLevel(post.card_levels?.[card.id])}</strong>
-              </span>
+              <div className="community-snapshot-item" key={card.id} title={`${card.name}: ${formatLevel(post.card_levels?.[card.id])}`}>
+                <CardImage card={card} className="community-snapshot-image" />
+                <span className="community-snapshot-copy">
+                  <small>{card.name}</small>
+                  <strong>{formatLevel(post.card_levels?.[card.id])}</strong>
+                </span>
+              </div>
             ))}
           </div>
-        </details>
+        </section>
         <p className="community-post-body">{post.body}</p>
         <div className="community-card-suggestions">
           {items.map((item) => {

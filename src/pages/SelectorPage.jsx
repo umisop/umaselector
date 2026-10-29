@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, CircleHelp, GitCompare, Info, ListChecks, RotateCcw, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, CircleHelp, GitCompare, Info, ListChecks, Minus, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import CardImage from "../components/CardImage";
 import RunningStyleLogo from "../components/RunningStyleLogo";
 import CommunitySection from "../components/CommunitySection";
@@ -8,7 +8,28 @@ import SkillDetailModal from "../components/SkillDetailModal";
 import CompareCardsModal from "../components/CompareCardsModal";
 import { readSitePreferences, subscribeSitePreferences } from "../lib/sitePreferences";
 import { findMatchingScenario, getScenarioRecommendations, LEVEL_OPTIONS, RECOMMENDATION_CATEGORIES, RUNNING_STYLES } from "../lib/scenarioEngine";
-import { buildRuleBasedRecommendations, combineUniversalAndStyleRecommendations, evaluateRecommendationItems, orderRecommendationsByStatus } from "../lib/recommendationRules";
+import {
+  buildRuleBasedRecommendations,
+  combineUniversalAndStyleRecommendations,
+  evaluateMinimumUsableBreakpoint,
+  evaluateRecommendationItems,
+  isWisdomCard,
+  orderRecommendationsByStatus,
+} from "../lib/recommendationRules";
+import {
+  applyRedeemsToLevel,
+  DEFAULT_TICKET_COUNTS,
+  findCompatibleTicketPool,
+  getMaxRedeemsFromLevel,
+  getMinimumProjectedLevel,
+  getNextLevel,
+  getPlannedTicketCounts,
+  getRedeemsForCard,
+  getStartingLevelForProjectedLevel,
+  isCardAvailableInPool,
+  normalizeStartingLevel,
+  SELECTOR_POOLS,
+} from "../lib/redeemPlanner";
 
 const CORE_ORDER = ["kitasan-black", "super-creek", "fine-motion", "agnes-tachyon", "maruzensky", "mr-cb"];
 
@@ -113,32 +134,264 @@ function RecommendationPanel({ category, items, cardMap, skillOverrides = {} }) 
   );
 }
 
+function lbLabel(level) {
+  if (level === null || level === undefined) return "Set current LB";
+  if (level === -1) return "Not owned";
+  return `LB${level}`;
+}
+
+function RedeemPlanner({
+  ticketCounts,
+  plannedCounts,
+  remainingCounts,
+  totalRemaining,
+  planRows,
+  candidates,
+  onTicketCountChange,
+  onRedeem,
+  onRemoveExchange,
+  onCandidateLevelChange,
+  skillOverrides = {},
+}) {
+  const [activeSkill, setActiveSkill] = useState(null);
+  const closeSkillModal = useCallback(() => setActiveSkill(null), []);
+
+  return (
+    <section className="redeem-planner" aria-label="Interactive redeem planner">
+      <div className="redeem-planner-heading">
+        <div>
+          <span className="section-kicker">YOUR SELECTOR EXCHANGE PLAN</span>
+          <h3>Redeem Planner</h3>
+          <p>Choose the cards you want to exchange for.</p>
+        </div>
+        <div className="redeem-remaining" aria-live="polite">
+          <strong>{totalRemaining}</strong>
+          <span>tickets remaining</span>
+        </div>
+      </div>
+
+      <div className="redeem-ticket-pools">
+        {SELECTOR_POOLS.map((pool) => (
+          <div className="redeem-pool-row" key={pool.id}>
+            <div className="redeem-pool-copy">
+              <strong>{pool.label}</strong>
+              <span>Up to {pool.maxCardName}</span>
+              <small>
+                {remainingCounts[pool.id]} available · {plannedCounts[pool.id]} assigned
+              </small>
+            </div>
+            <div className="redeem-pool-counter" aria-label={`${pool.label} quantity`}>
+              <button type="button" onClick={() => onTicketCountChange(pool.id, -1)} disabled={ticketCounts[pool.id] <= plannedCounts[pool.id]} aria-label={`Remove one ${pool.label} ticket`}>
+                <Minus size={14} />
+              </button>
+              <strong>{ticketCounts[pool.id]}</strong>
+              <button type="button" onClick={() => onTicketCountChange(pool.id, 1)} disabled={ticketCounts[pool.id] >= pool.maxTickets} aria-label={`Add one ${pool.label} ticket`}>
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="redeem-section-heading">
+        <div>
+          <span className="section-kicker">SELECT A TARGET</span>
+          <h4>Recommended exchanges</h4>
+        </div>
+        <span className="redeem-section-count">{candidates.length} candidates</span>
+      </div>
+
+      {candidates.length === 0 ? (
+        <p className="redeem-empty">No eligible recommendations are available for this Core Card setup.</p>
+      ) : (
+        <div className="redeem-candidate-list">
+          {candidates.map((candidate) => {
+            const { card, item, currentLevel, nextLevel, isCore, levelKnown, compatiblePool, redeemedCount } = candidate;
+            // The evaluator belongs to the recommendation item; it is not a top-level candidate field.
+            // Read it from item so the live breakpoint note stays visible after each simulated redeem.
+            const automaticEvaluation = item?.automaticEvaluation || candidate.automaticEvaluation || null;
+            const EvaluationIcon = automaticEvaluation?.tone === "positive" ? CheckCircle2 : automaticEvaluation?.tone === "warning" ? AlertTriangle : Info;
+            const minUsableLb = Number(item?.minUsableLb);
+            const hasMinUsableLb = item?.minUsableLb !== null && item?.minUsableLb !== undefined && item?.minUsableLb !== "" && Number.isInteger(minUsableLb) && minUsableLb >= 0 && minUsableLb <= 4;
+            const skills = Array.isArray(item?.skills) ? item.skills : [];
+            const disabledReason = !levelKnown
+              ? "Choose this card's current LB first."
+              : currentLevel >= 4
+                ? "Already at MLB."
+                : !compatiblePool
+                  ? "No unused compatible ticket remains. Add a ticket or remove a planned exchange."
+                  : "";
+            return (
+              <article className="redeem-candidate-row" key={card.id}>
+                <CardImage card={card} className="redeem-candidate-image" />
+                <div className="redeem-candidate-content">
+                  <div className="redeem-candidate-title-row">
+                    <h5>{card.name}</h5>
+                    <span className={`recommendation-status ${item.status === "alternative" ? "alternative" : "recommended"}`}>{item.status === "alternative" ? "Alternative" : "Recommended"}</span>
+                  </div>
+                  <div className="redeem-candidate-meta">
+                    {card.type || "Support Card"} <span>·</span> {lbLabel(currentLevel)}
+                    {nextLevel !== null && nextLevel !== undefined && (
+                      <>
+                        <ArrowRight size={12} /> {lbLabel(nextLevel)}
+                      </>
+                    )}
+                    {hasMinUsableLb && (
+                      <>
+                        <span>·</span>
+                        <span>
+                          Minimum usable <strong className="recommendation-usable-lb">LB{minUsableLb}</strong>
+                        </span>
+                      </>
+                    )}
+                    {redeemedCount > 0 && <span className="redeem-count-note">{redeemedCount} planned</span>}
+                  </div>
+                  {skills.length > 0 && (
+                    <div className="recommendation-skills redeem-candidate-skills" aria-label={`Skills for ${card.name}`}>
+                      <span>Skill{skills.length > 1 ? "s" : ""}: </span>
+                      {skills.map((skill, skillIndex) => {
+                        const skillId = String(skill?.id || "");
+                        const skillName = String(skill?.name || `Skill ${skillId}`);
+                        return (
+                          <span className="recommendation-skill-entry" key={`${skillId}-${skillIndex}`}>
+                            {skillIndex > 0 && <span className="recommendation-skill-separator">, </span>}
+                            <button type="button" className="recommendation-skill-link" onClick={() => setActiveSkill({ id: skillId, name: skillName })}>
+                              {skillName}
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {item?.note && item.note.trim() && item.note.trim() !== automaticEvaluation?.message?.trim() && <p className="redeem-candidate-rule-note">{item.note}</p>}
+                  {!isCore && (
+                    <label className="redeem-current-level">
+                      <span>Current level</span>
+                      <select value={candidate.currentLevel ?? ""} onChange={(event) => onCandidateLevelChange(card.id, event.target.value)} aria-label={`Current level for ${card.name}`}>
+                        <option value="">Choose current level</option>
+                        {getMinimumProjectedLevel(candidate.redeemedCount) === -1 && <option value="-1">Not owned</option>}
+                        {[0, 1, 2, 3, 4]
+                          .filter((level) => level >= getMinimumProjectedLevel(candidate.redeemedCount))
+                          .map((level) => (
+                            <option key={level} value={level}>
+                              LB{level}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  )}
+                  {automaticEvaluation?.message && (
+                    <div className={`redeem-breakpoint-note ${automaticEvaluation.tone ? `tone-${automaticEvaluation.tone}` : ""}`}>
+                      <strong>
+                        <EvaluationIcon size={13} /> {automaticEvaluation.title || "Breakpoint evaluation"}
+                      </strong>
+                      <p>{automaticEvaluation.message}</p>
+                    </div>
+                  )}
+                  {!automaticEvaluation?.message && !item?.note && !hasMinUsableLb && skills.length === 0 && (
+                    <p className="redeem-candidate-rule-note">No additional breakpoint note is configured for this target.</p>
+                  )}
+                  {!levelKnown && <p className="redeem-unavailable-hint">Choose the current LB to calculate a safe exchange limit.</p>}
+                  {levelKnown && currentLevel < 4 && !compatiblePool && <p className="redeem-unavailable-hint">No unused compatible ticket remains. Add a ticket or remove a planned exchange.</p>}
+                </div>
+                <button
+                  type="button"
+                  className="redeem-action-button"
+                  onClick={() => onRedeem(candidate)}
+                  disabled={!levelKnown || currentLevel >= 4 || !compatiblePool}
+                  title={disabledReason || `Use one ${compatiblePool?.label} ticket`}
+                >
+                  <Plus size={15} /> Redeem
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="redeem-plan-entries">
+        <div className="redeem-section-heading">
+          <div>
+            <span className="section-kicker">LOCKED-IN EXCHANGES</span>
+            <h4>Your exchange plan</h4>
+          </div>
+          <span className="redeem-section-count">{planRows.length} assigned</span>
+        </div>
+        {planRows.length === 0 ? (
+          <p className="redeem-empty">No tickets assigned yet.</p>
+        ) : (
+          <ol className="redeem-plan-list">
+            {planRows.map((entry, index) => (
+              <li className="redeem-plan-entry" key={entry.id}>
+                <span className="redeem-plan-index">{String(index + 1).padStart(2, "0")}</span>
+                <div className="redeem-plan-entry-copy">
+                  <strong>{entry.card?.name || entry.cardId}</strong>
+                  <span>
+                    {entry.poolLabel} · {lbLabel(entry.currentLevel)} <ArrowRight size={12} /> {lbLabel(entry.nextLevel)}
+                  </span>
+                </div>
+                <button type="button" className="redeem-remove-button" onClick={() => onRemoveExchange(entry.id)} aria-label={`Remove ${entry.card?.name || entry.cardId} exchange`}>
+                  <Trash2 size={14} /> Remove
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+      {activeSkill && (
+        <SkillDetailModal skillId={activeSkill.id} fallbackName={activeSkill.name} activationExplanation={skillOverrides?.[activeSkill.id]?.activationExplanation} onClose={closeSkillModal} />
+      )}
+    </section>
+  );
+}
+
 export default function SelectorPage({ config, loading }) {
   const [selectedStyles, setSelectedStyles] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
   const [sitePreferences, setSitePreferences] = useState(() => readSitePreferences());
   useEffect(() => subscribeSitePreferences(setSitePreferences), []);
   const [levels, setLevels] = useState({});
+  const [ticketCounts, setTicketCounts] = useState({ ...DEFAULT_TICKET_COUNTS });
+  const [redeemPlan, setRedeemPlan] = useState([]);
+  const [candidateLevels, setCandidateLevels] = useState({});
   const cards = Array.isArray(config?.cards) ? config.cards : [];
   const coreCards = useMemo(() => sortCoreCards(cards.filter((card) => card.isCore)), [cards]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [String(card.id), card])), [cards]);
   const allCoreFilled = coreCards.length > 0 && coreCards.every((card) => levels[card.id] !== undefined && levels[card.id] !== null);
+  const plannedTicketCounts = useMemo(() => getPlannedTicketCounts(redeemPlan), [redeemPlan]);
+  const remainingTicketCounts = useMemo(
+    () => Object.fromEntries(SELECTOR_POOLS.map((pool) => [pool.id, Math.max(0, Number(ticketCounts[pool.id] || 0) - plannedTicketCounts[pool.id])])),
+    [ticketCounts, plannedTicketCounts],
+  );
+  const totalTicketsRemaining = useMemo(() => Object.values(remainingTicketCounts).reduce((sum, count) => sum + count, 0), [remainingTicketCounts]);
+  const planningLevels = useMemo(() => {
+    const next = { ...levels };
+    for (const card of coreCards) {
+      if (levels[card.id] === undefined || levels[card.id] === null) continue;
+      next[card.id] = applyRedeemsToLevel(Number(levels[card.id]), getRedeemsForCard(redeemPlan, card.id).length);
+    }
+    return next;
+  }, [levels, coreCards, redeemPlan]);
   const legacyMatchedScenario = useMemo(() => (allCoreFilled ? findMatchingScenario(config?.scenarios, levels, coreCards) : null), [allCoreFilled, config?.scenarios, levels, coreCards]);
+  const planningMatchedScenario = useMemo(
+    () => (allCoreFilled ? findMatchingScenario(config?.scenarios, planningLevels, coreCards) : null),
+    [allCoreFilled, config?.scenarios, planningLevels, coreCards],
+  );
   const ruleEngineEnabled = config?.recommendationModel?.enabled === true;
   const ruleBasedResult = useMemo(
-    () => (allCoreFilled && ruleEngineEnabled ? buildRuleBasedRecommendations(config, levels, coreCards, { activeCategories: ["universal", ...selectedStyles] }) : null),
-    [allCoreFilled, ruleEngineEnabled, config, levels, coreCards, selectedStyles],
+    () => (allCoreFilled && ruleEngineEnabled ? buildRuleBasedRecommendations(config, planningLevels, coreCards, { activeCategories: ["universal", ...selectedStyles] }) : null),
+    [allCoreFilled, ruleEngineEnabled, config, planningLevels, coreCards, selectedStyles],
   );
   const evaluatedLegacyScenario = useMemo(() => {
-    if (!legacyMatchedScenario || ruleEngineEnabled) return legacyMatchedScenario;
+    if (!planningMatchedScenario || ruleEngineEnabled) return planningMatchedScenario;
     const evaluatedRecommendations = Object.fromEntries(
       RECOMMENDATION_CATEGORIES.map((category) => [
         category.id,
-        evaluateRecommendationItems(getScenarioRecommendations(legacyMatchedScenario, category.id), category.id, levels, coreCards, cards).items,
+        evaluateRecommendationItems(getScenarioRecommendations(planningMatchedScenario, category.id), category.id, planningLevels, coreCards, cards).items,
       ]),
     );
-    return { ...legacyMatchedScenario, recommendations: evaluatedRecommendations };
-  }, [legacyMatchedScenario, ruleEngineEnabled, levels, coreCards, cards]);
+    return { ...planningMatchedScenario, recommendations: evaluatedRecommendations };
+  }, [planningMatchedScenario, ruleEngineEnabled, planningLevels, coreCards, cards]);
   const matchedScenario = ruleEngineEnabled ? ruleBasedResult : evaluatedLegacyScenario;
 
   const recommendationGroups = useMemo(() => {
@@ -170,6 +423,75 @@ export default function SelectorPage({ config, loading }) {
       };
     });
   }, [matchedScenario, selectedStyles]);
+
+  const plannerCandidates = useMemo(() => {
+    if (!matchedScenario) return [];
+    const byCardId = new Map();
+    for (const group of recommendationGroups) {
+      const categoryId = group.styleId || "universal";
+      for (const item of orderRecommendationsByStatus(group.items || [])) {
+        const card = cardMap.get(String(item.cardId));
+        if (!card) continue;
+        const cardId = String(card.id);
+        const hasSelectedEligiblePool = SELECTOR_POOLS.some((pool) => Number(ticketCounts[pool.id] || 0) > 0 && isCardAvailableInPool(card, pool.id));
+        if (!hasSelectedEligiblePool) continue;
+        const isCore = coreCards.some((core) => String(core.id) === cardId);
+        const startingLevel = isCore ? normalizeStartingLevel(levels[cardId]) : normalizeStartingLevel(candidateLevels[cardId]);
+        const redeemCount = getRedeemsForCard(redeemPlan, cardId).length;
+        const currentLevel = startingLevel === null ? null : applyRedeemsToLevel(startingLevel, redeemCount);
+        if (currentLevel === 4) continue;
+        const reevaluated = evaluateRecommendationItems([item], categoryId, planningLevels, coreCards, cards).items[0];
+        if (!reevaluated) continue;
+        const coreOrWisdomEvaluation = reevaluated.automaticEvaluation || item.automaticEvaluation || null;
+        const usableBreakpointEvaluation = !isCore && !isWisdomCard(card) ? evaluateMinimumUsableBreakpoint(card, currentLevel, reevaluated.minUsableLb ?? item.minUsableLb) : null;
+        // For ordinary non-Core cards, the admin-defined Minimum usable LB is the live source of truth.
+        // Core Cards keep their specialized rules, and Wit cards keep the existing Wit-specific caution.
+        const automaticEvaluation = usableBreakpointEvaluation || coreOrWisdomEvaluation;
+        const liveItem = {
+          ...reevaluated,
+          ...(usableBreakpointEvaluation ? { status: usableBreakpointEvaluation.recommendationStatus } : {}),
+          automaticEvaluation,
+        };
+        const candidate = {
+          card,
+          item: liveItem,
+          categoryId,
+          isCore,
+          startingLevel,
+          levelKnown: startingLevel !== null,
+          currentLevel,
+          nextLevel: getNextLevel(currentLevel),
+          redeemCount,
+          compatiblePool: findCompatibleTicketPool(card, ticketCounts, redeemPlan),
+        };
+        const previous = byCardId.get(cardId);
+        const score = (entry) => (entry.item.status === "alternative" ? 0 : 10) + (entry.item.automaticEvaluation?.tone === "positive" ? 5 : 0);
+        if (!previous || score(candidate) > score(previous)) byCardId.set(cardId, candidate);
+      }
+    }
+    return [...byCardId.values()].sort((a, b) => {
+      const aRank = (a.item.status === "alternative" ? 0 : 10) + (a.item.automaticEvaluation?.tone === "positive" ? 5 : 0);
+      const bRank = (b.item.status === "alternative" ? 0 : 10) + (b.item.automaticEvaluation?.tone === "positive" ? 5 : 0);
+      return bRank - aRank;
+    });
+  }, [matchedScenario, recommendationGroups, cardMap, coreCards, levels, candidateLevels, redeemPlan, planningLevels, cards, ticketCounts]);
+
+  const planRows = useMemo(() => {
+    const cursor = {};
+    for (const card of cards) {
+      const id = String(card.id);
+      const isCore = coreCards.some((core) => String(core.id) === id);
+      cursor[id] = isCore ? normalizeStartingLevel(levels[id]) : normalizeStartingLevel(candidateLevels[id]);
+    }
+    return redeemPlan.map((entry, index) => {
+      const id = String(entry.cardId);
+      const currentLevel = normalizeStartingLevel(cursor[id]);
+      const nextLevel = getNextLevel(currentLevel);
+      if (nextLevel !== null) cursor[id] = nextLevel;
+      const pool = SELECTOR_POOLS.find((item) => item.id === entry.poolId);
+      return { ...entry, index, card: cardMap.get(id), currentLevel, nextLevel, poolLabel: pool?.label || "Selector ticket" };
+    });
+  }, [redeemPlan, cards, coreCards, levels, candidateLevels, cardMap]);
 
   const compareInitialSlots = useMemo(() => {
     const candidates = [];
@@ -212,12 +534,90 @@ export default function SelectorPage({ config, loading }) {
       else next[cardId] = Number(rawValue);
       return next;
     });
+    setRedeemPlan((current) => {
+      const startingLevel = rawValue === "" ? null : Number(rawValue);
+      const capacity = getMaxRedeemsFromLevel(startingLevel);
+      let keptForCard = 0;
+      return current.filter((entry) => {
+        if (String(entry.cardId) !== String(cardId)) return true;
+        if (keptForCard >= capacity) return false;
+        keptForCard += 1;
+        return true;
+      });
+    });
+  }
+
+  function changeTicketCount(poolId, delta) {
+    const pool = SELECTOR_POOLS.find((item) => item.id === poolId);
+    if (!pool) return;
+    const minimum = plannedTicketCounts[poolId] || 0;
+    setTicketCounts((current) => ({
+      ...current,
+      [poolId]: Math.min(pool.maxTickets, Math.max(minimum, Number(current[poolId] || 0) + delta)),
+    }));
+  }
+
+  function changeCandidateLevel(cardId, rawValue) {
+    const projectedLevel = rawValue === "" ? null : Number(rawValue);
+    const plannedRedeemCount = getRedeemsForCard(redeemPlan, cardId).length;
+    // The dropdown shows the effective level after planned redeems. Convert that
+    // selection back to the base inventory level before preserving the plan, so
+    // selecting the already displayed LB cannot count the same redeem twice.
+    const startingLevel = projectedLevel === null ? null : getStartingLevelForProjectedLevel(projectedLevel, plannedRedeemCount);
+    if (projectedLevel !== null && startingLevel === null) return;
+
+    setCandidateLevels((current) => ({ ...current, [cardId]: startingLevel }));
+    setRedeemPlan((current) => {
+      if (startingLevel === null) return current.filter((entry) => String(entry.cardId) !== String(cardId));
+      const capacity = getMaxRedeemsFromLevel(startingLevel);
+      let keptForCard = 0;
+      return current.filter((entry) => {
+        if (String(entry.cardId) !== String(cardId)) return true;
+        if (keptForCard >= capacity) return false;
+        keptForCard += 1;
+        return true;
+      });
+    });
+  }
+
+  function addRedeem(candidate) {
+    if (!candidate?.levelKnown || candidate.currentLevel === null || candidate.currentLevel >= 4) return;
+    const pool = findCompatibleTicketPool(candidate.card, ticketCounts, redeemPlan);
+    if (!pool) return;
+    const currentCount = getRedeemsForCard(redeemPlan, candidate.card.id).length;
+    const capacity = getMaxRedeemsFromLevel(candidate.startingLevel);
+    if (currentCount >= capacity) return;
+    const id = `exchange-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    setRedeemPlan((current) => [...current, { id, cardId: String(candidate.card.id), poolId: pool.id }]);
+  }
+
+  function removeRedeem(exchangeId) {
+    setRedeemPlan((current) => current.filter((entry) => entry.id !== exchangeId));
   }
 
   function resetViewer() {
     setLevels({});
     setSelectedStyles([]);
+    setTicketCounts({ ...DEFAULT_TICKET_COUNTS });
+    setRedeemPlan([]);
+    setCandidateLevels({});
   }
+
+  const redeemPlanner = (
+    <RedeemPlanner
+      ticketCounts={ticketCounts}
+      plannedCounts={plannedTicketCounts}
+      remainingCounts={remainingTicketCounts}
+      totalRemaining={totalTicketsRemaining}
+      planRows={planRows}
+      candidates={plannerCandidates}
+      onTicketCountChange={changeTicketCount}
+      onRedeem={addRedeem}
+      onRemoveExchange={removeRedeem}
+      onCandidateLevelChange={changeCandidateLevel}
+      skillOverrides={config?.skillOverrides || {}}
+    />
+  );
 
   return (
     <main className="page-shell">
@@ -290,7 +690,18 @@ export default function SelectorPage({ config, loading }) {
           <span className={`counter-pill ${allCoreFilled ? "counter-complete" : ""}`}>
             {Object.keys(levels).filter((id) => coreCards.some((card) => card.id === id)).length} / {coreCards.length} complete
           </span>
-          <button type="button" className="reset-viewer-button" onClick={resetViewer} disabled={Object.keys(levels).length === 0 && selectedStyles.length === 0}>
+          <button
+            type="button"
+            className="reset-viewer-button"
+            onClick={resetViewer}
+            disabled={
+              Object.keys(levels).length === 0 &&
+              selectedStyles.length === 0 &&
+              redeemPlan.length === 0 &&
+              Object.values(candidateLevels).every((value) => value === null || value === undefined) &&
+              SELECTOR_POOLS.every((pool) => Number(ticketCounts[pool.id] || 0) === DEFAULT_TICKET_COUNTS[pool.id])
+            }
+          >
             <RotateCcw size={14} /> Reset all
           </button>
         </div>
@@ -383,28 +794,26 @@ export default function SelectorPage({ config, loading }) {
             </div>
           </div>
         ) : !matchedScenario ? (
-          <div className="recommendation-empty">
-            <div className="recommendation-icon">
-              <CircleHelp size={24} />
+          <>
+            <div className="recommendation-empty">
+              <div className="recommendation-icon">
+                <CircleHelp size={24} />
+              </div>
+              <div className="recommendation-copy">
+                <h3>No new recommendations available</h3>
+                <p>
+                  {ruleEngineEnabled
+                    ? "No base recommendations or matching overrides produce results for this simulated Core Card combination yet. You can still review or undo exchanges already in your plan."
+                    : "There are no recommendations configured for this simulated Core Card combination yet. You can still review or undo exchanges already in your plan."}
+                </p>
+              </div>
             </div>
-            <div className="recommendation-copy">
-              <h3>No recommendations available</h3>
-              <p>
-                {ruleEngineEnabled
-                  ? "No base recommendations or matching overrides produce results for this combination yet."
-                  : "There are no recommendations configured for this combination of Core Card levels yet."}
-              </p>
-            </div>
-          </div>
+            {redeemPlanner}
+          </>
         ) : (
           <>
-            <div className="results-category-list">
-              {recommendationGroups.map((group) => (
-                <RecommendationPanel key={group.id} category={group} items={group.items} cardMap={cardMap} skillOverrides={config?.skillOverrides || {}} />
-              ))}
-            </div>
-            {!selectedStyles.length && <p className="result-hint">Select one or more running styles to combine Universal recommendations with each selected style independently.</p>}
-            {recommendationGroups.some((group) => (group.items || []).length > 0) && (
+            {redeemPlanner}
+            {plannerCandidates.length > 0 && (
               <section className="compare-callout" aria-label="Compare support cards">
                 <div className="compare-callout-icon">
                   <GitCompare size={19} />

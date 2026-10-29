@@ -613,14 +613,24 @@ export default function CompareCardsModal({ initialSlots = [], onClose }) {
                 {showOtherTrainings ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 {showOtherTrainings ? "Hide other trainings" : "Show other trainings"}
               </button>
-              <p className="compare-method-note">We apologize for any calculation inaccuracies. Please refer to uma.guide or Gamewith.jp for better training calculations.</p>
+              <p className="compare-method-note">
+                We apologize for any calculation inaccuracies. Please refer to{" "}
+                <a href="https://uma.guide/support-cards/compare" target="_blank" rel="noreferrer">
+                  Uma.Guide <ExternalLink size={8} />
+                </a>{" "}
+                or{" "}
+                <a href="https://gamewith.jp/uma-musume/article/show/283210" target="_blank" rel="noreferrer">
+                  Gamewith.jp <ExternalLink size={8} />
+                </a>{" "}
+                for better training calculations.
+              </p>
             </div>
           )}
         </div>
 
         <footer className="compare-modal-footer">
           <span>
-            Global catalogue: {catalogState.cards.length || "—"} cards · Card data:{" "}
+            Card data:{" "}
             <a href="https://github.com/daftuyda/UmaTools" target="_blank" rel="noreferrer">
               UmaTools <ExternalLink size={11} />
             </a>{" "}
@@ -628,10 +638,6 @@ export default function CompareCardsModal({ initialSlots = [], onClose }) {
             <a href={scenarioInfo?.source || "https://gametora.vercel.app/umamusume/grand-masters"} target="_blank" rel="noreferrer">
               GameTora <ExternalLink size={11} />
             </a>{" "}
-            · Reference:{" "}
-            <a href="https://uma.guide/support-cards/compare" target="_blank" rel="noreferrer">
-              UmaGuide <ExternalLink size={11} />
-            </a>
           </span>
           <button type="button" className="compare-done-button" onClick={onClose}>
             Done

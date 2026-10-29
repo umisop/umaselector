@@ -10,7 +10,9 @@
     "test:auto-evaluation": "node tests/automatic-evaluation.test.mjs",
     "test:compare": "node tests/support-card-compare.test.mjs",
     "test:recommendations": "node tests/recommendation-order.test.mjs",
-    "test:youtube-preference": "node tests/youtube-default-preference.test.mjs"
+    "test:youtube-preference": "node tests/youtube-default-preference.test.mjs",
+    "test:redeem-planner": "node tests/redeem-planner.test.mjs",
+    "test:redeem-planner-ui": "node tests/redeem-planner-ui.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",

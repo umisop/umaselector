@@ -197,14 +197,20 @@ export default function CommunityPostForm({ cards, coreCards, levels, initialPos
           </div>
         ))}
       </div>
-      <div className="community-loadout-note">
-        <strong>Core card snapshot</strong>
-        <p>{coreCards.map((card) => `${card.name}: ${formatLevel(sourceLevels?.[card.id])}`).join(" · ") || "Unavailable"}</p>
-        <small>
-          {initialPost
-            ? "The card snapshot from the original submission will not change when you edit this post."
-            : "The snapshot is taken from the six Core Cards currently selected in the Selector."}
-        </small>
+      <div className="community-loadout-note" aria-label="Core card snapshot">
+        <strong>Core card LB's</strong>
+        <div className="community-snapshot-grid community-snapshot-form-grid">
+          {coreCards.map((card) => (
+            <div className="community-snapshot-item" key={card.id} title={`${card.name}: ${formatLevel(sourceLevels?.[card.id])}`}>
+              <CardImage card={card} className="community-snapshot-image" />
+              <span className="community-snapshot-copy">
+                <small>{card.name}</small>
+                <strong>{formatLevel(sourceLevels?.[card.id])}</strong>
+              </span>
+            </div>
+          ))}
+          {!coreCards.length && <small className="community-snapshot-empty">Core card data unavailable.</small>}
+        </div>
       </div>
       {(formError || error) && (
         <p className="community-form-error" role="alert">
