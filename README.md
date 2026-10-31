@@ -52,7 +52,7 @@ The evaluator only applies configured and documented rules; it is not an indepen
 
 - `/profile`: edit public display name, manage your own Community recommendations, and sign out.
 - Forgot-password flow for email/password accounts.
-- About, FAQ, Feedback, Privacy Policy, Cookie Settings, Terms of Use, and Contact pages.
+- Documentation, About, FAQ, Feedback, Privacy Policy, Cookie Settings, Terms of Use, and Contact pages.
 - Cookie settings control the optional embedded YouTube media preference in the current browser.
 - Feedback is submitted privately by signed-in users and is not part of the public Community feed.
 

@@ -63,6 +63,47 @@ function AboutContent() {
   );
 }
 
+function DocsContent() {
+  return (
+    <>
+      <InfoTitle
+        kicker="USER GUIDE"
+        title="Documentation"
+        description="A quick guide to setting up your support-card selector and understanding its recommendations."
+        icon={FileText}
+      />
+      <InfoSection title="1. Choose your running styles">
+        <p>Select every running style you play. Universal recommendations are always included, and each selected style gets its own recommendation group.</p>
+      </InfoSection>
+      <InfoSection title="2. Set your Core Card levels">
+        <p>For each of the six Core Cards, choose Not Owned or its current limit-break level from LB0 to LB4. The recommendations update to match that loadout.</p>
+        <p>These six levels are used to evaluate the configured recommendations. The selector does not ask for the level of every other support card.</p>
+      </InfoSection>
+      <InfoSection title="3. Review recommendations and exchange options">
+        <p>Review the recommended cards and their status for your selected running styles. When exchange candidates are available, use <strong>Compare Cards</strong> to compare training results for the options you are considering.</p>
+        <p>Recommendations are guidance based on the site's configured rules. They may not fit every account or strategy, so check the card details and your own needs before exchanging.</p>
+      </InfoSection>
+      <InfoSection title="4. Browse the Community">
+        <p>Community recommendations are submitted by players. You can browse and sort posts; signing in lets you publish, vote, report posts, and manage your own recommendations from My Profile.</p>
+        <p>Community posts are player opinions and are not guaranteed to be correct or optimal. See the <a href="/faq">FAQ</a> for account and Community questions.</p>
+      </InfoSection>
+      <InfoSection title="Project source code">
+        <p>The project is open source. You can review its source code, report an issue, or follow development on GitHub.</p>
+        <div className="site-info-contact-list">
+          <a href="https://github.com/umisop/umaselector" target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={19} />
+            <span>
+              <strong>Card Exchange Selector on GitHub</strong>
+              <small>Open the source repository in a new tab.</small>
+            </span>
+            <ChevronRight size={16} />
+          </a>
+        </div>
+      </InfoSection>
+    </>
+  );
+}
+
 function FAQContent() {
   const items = [
     [
@@ -524,6 +565,7 @@ function ContactContent() {
 }
 
 const PAGE_CONTENT = {
+  "/docs": DocsContent,
   "/about": AboutContent,
   "/faq": FAQContent,
   "/feedback": FeedbackContent,
@@ -534,6 +576,7 @@ const PAGE_CONTENT = {
 };
 
 const PAGE_TITLES = {
+  "/docs": "Documentation",
   "/about": "About",
   "/faq": "FAQ",
   "/feedback": "Feedback",
