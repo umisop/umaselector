@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   if (req.method && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
   try {
     const cards = await loadCatalog();
-    return res.status(200).json({ schemaVersion: 9, sourceName: 'UmaTools Global support-card dataset', sourceUrl: 'https://beta.daftuyda.moe/guides/deck-tools', cardCount: cards.length, cards });
+    return res.status(200).json({ schemaVersion: 10, sourceName: 'UmaTools Global support-card dataset', sourceUrl: 'https://beta.daftuyda.moe/guides/deck-tools', cardCount: cards.length, cards });
   } catch (error) {
     return res.status(502).json({ error: 'The Global support-card catalog could not be loaded.', detail: String(error?.message || error) });
   }

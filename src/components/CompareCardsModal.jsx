@@ -634,6 +634,10 @@ export default function CompareCardsModal({ initialSlots = [], onClose }) {
             <a href="https://github.com/daftuyda/UmaTools" target="_blank" rel="noreferrer">
               UmaTools <ExternalLink size={11} />
             </a>{" "}
+            · Reference:{" "}
+            <a href="https://uma.guide/support-cards/compare" target="_blank" rel="noreferrer">
+              UmaGuide <ExternalLink size={11} />
+            </a>{" "}
             · Base training:{" "}
             <a href={scenarioInfo?.source || "https://gametora.vercel.app/umamusume/grand-masters"} target="_blank" rel="noreferrer">
               GameTora <ExternalLink size={11} />

@@ -1,6 +1,6 @@
 // Bump the query key on catalogue schema/parser changes to bypass stale CDN responses.
-const API_PATH = '/api/support-card-compare?schema=9';
-const SUPPORT_COMPARE_API_SCHEMA_VERSION = 9;
+const API_PATH = '/api/support-card-compare?schema=10';
+const SUPPORT_COMPARE_API_SCHEMA_VERSION = 10;
 let catalogPromise = null;
 
 function firstText(...values) {
@@ -12,6 +12,7 @@ function firstText(...values) {
 }
 
 import { SUPPORT_CARD_COMPARE_SCENARIOS as scenarioConfig } from '../data/supportCardCompareScenarios.js';
+import { SUPPORT_CARD_UNIQUE_SOURCE } from '../data/supportCardUniqueSource.js';
 
 // In the raw Global catalogue, support unique mechanic IDs 101–122 are not
 // ordinary bonus IDs. For example, ID 111 means “apply a bonus per facility
@@ -115,6 +116,9 @@ function normalizeRawUniqueEffect(effect, uniqueMetadata = {}) {
   const parentUniqueDescription = firstText(uniqueMetadata?.description, uniqueMetadata?.desc, uniqueMetadata?.text, uniqueMetadata?.detail);
   const uniqueNarrative = [originalDescription, parentUniqueDescription].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   const originalMechanic = firstText(effect?.mechanic, effect?.mechanicId, effect?.formula, effect?.effectType);
+  if (Number(effect?.id) === 9991 || /increases? stats? from hints/i.test(rawName)) {
+    return [{ id: 9991, sourceTypeId: 9991, name: 'Unique: Stats from Hints', symbol: 'none', value: 0, description: uniqueNarrative || originalDescription, mechanic: UNIQUE_EFFECT_MECHANICS.UNSUPPORTED_DYNAMIC }];
+  }
   const regular = {
     id,
     name: rawName,
@@ -124,6 +128,10 @@ function normalizeRawUniqueEffect(effect, uniqueMetadata = {}) {
     description: originalDescription,
     mechanic: originalMechanic,
   };
+  if (id === 30 && rawValue === 0) {
+    const describedSkillPointBonus = uniqueNarrative.match(/increases? skill point gain when training together\s*\(([\d.]+)\)/i);
+    if (describedSkillPointBonus) return [{ ...regular, value: Number(describedSkillPointBonus[1]), description: uniqueNarrative }];
+  }
   // A catalogue may already have translated the displayed effect name while
   // retaining the raw mechanic id (e.g. typeId=111, name='Training Effectiveness').
   // Normalize by mechanic id in that shape too; mechanic ids 101–122 are never
@@ -151,6 +159,11 @@ function normalizeRawUniqueEffect(effect, uniqueMetadata = {}) {
   const targetId = rawValue;
   const step = amount(0);
 
+  const narrativeTargets = { 'Friendship Bonus': 1, 'Mood Effect': 2, 'Speed Bonus': 3, 'Stamina Bonus': 4, 'Power Bonus': 5, 'Guts Bonus': 6, 'Wit Bonus': 7, 'Training Effectiveness': 8, 'Increased Training': 8, 'Initial Speed': 9, 'Initial Stamina': 10, 'Initial Power': 11, 'Initial Guts': 12, 'Initial Wit': 13, 'Initial Friendship Gauge': 14, 'Specialty Priority': 19, 'Energy Cost Reduction': 28, 'Skill Point Bonus': 30, 'Wit Friendship Recovery': 31 };
+  const describedBonuses = [...uniqueNarrative.matchAll(/Gain\s+([A-Za-z ]+?)\s*\(([\d.]+)(?:%?)\)/gi)].map((match) => ({ label: match[1].trim(), value: Number(match[2]) })).filter((item) => Number.isFinite(item.value) && narrativeTargets[item.label]);
+  if ([101, 102, 103, 113].includes(id) && describedBonuses.length) {
+    return describedBonuses.map((item) => make(narrativeTargets[item.label], item.value, uniqueNarrative, ''));
+  }
   switch (id) {
     case 101: {
       const results = [];
@@ -163,24 +176,45 @@ function normalizeRawUniqueEffect(effect, uniqueMetadata = {}) {
       return [make(8, step, `${thresholdDescription(rawValue)}, and not training in specialty`)];
     case 103:
       return [make(8, step, `If deck has at least ${rawValue} different types of Support Cards`)];
-    case 104:
-      return [make(8, step, `Scaling every ${rawValue} fans, up to ${rawValue * step} fans`)];
-    case 105:
+    case 104: {
+      const perFanStep = Number(uniqueNarrative.match(/per\s+([\d,]+)\s+fans?/i)?.[1]?.replace(/,/g, '')) || rawValue;
+      const cap = Number(uniqueNarrative.match(/up to\s*\(?([\d.]+)/i)?.[1]) || step;
+      if (!perFanStep || !cap) return [{ ...make(8, 0, uniqueNarrative || 'Fan scaling formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
+      const details = uniqueNarrative || 'Scaling every ' + perFanStep + ' fans, up to ' + (perFanStep * cap) + ' fans';
+      return [make(8, cap, details, UNIQUE_EFFECT_MECHANICS.FAN_SCALING)];
+    }
+    case 105: {
+      const described = Number(uniqueNarrative.match(/Initial Stat Up\s*\(([\d.]+)/i)?.[1]) || rawValue;
       return [{
         id: 105, sourceTypeId: id, sourceTargetTypeId: 105, sourceValues: values,
-        name: 'Unique: Starting Stats for Every Support Type in Deck', symbol: 'none', value: rawValue,
-        description: values.length ? `Friend and group cards are worth ${amount(0)} to each stat` : originalDescription,
-        mechanic: 'deck-starting-stats',
+        name: 'Unique: Starting Stats for Every Support Type in Deck', symbol: 'none', value: described,
+        description: uniqueNarrative || (values.length ? `Friend and group cards are worth ${amount(0)} to each stat` : originalDescription),
+        mechanic: UNIQUE_EFFECT_MECHANICS.DECK_STARTING_STATS,
       }];
-    case 106: {
-      const targetType = amount(0);
-      const perTraining = amount(1);
-      return [make(targetType, perTraining * Math.max(0, rawValue), `Increases by ${perTraining} for every friendship training, up to ${rawValue} times`)];
     }
-    case 107:
-      return [make(targetId, amount(2), `Scales from ${amount(3)} to ${amount(2)} as energy approaches ${amount(1)} or lower (Set to 0 above 100 energy)`)];
-    case 108:
-      return [make(targetId, amount(3), `Scales from ${amount(2)} to ${amount(3)} as max energy approaches 120`)];
+    case 106: {
+      const term = describedBonuses.find((item) => item.label === 'Friendship Bonus');
+      const perTraining = term?.value || amount(1);
+      const cap = Number(uniqueNarrative.match(/up to\s+([\d,]+)\s+times?/i)?.[1]?.replace(/,/g, '')) || rawValue;
+      const targetType = term ? 1 : (amount(0) || 1);
+      if (!perTraining || !cap) return [{ ...make(targetType, 0, uniqueNarrative || 'Friendship-training scaling formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
+      return [{ ...make(targetType, perTraining * cap, uniqueNarrative || 'Increases by 2 for every friendship training, up to 3 times', UNIQUE_EFFECT_MECHANICS.FRIENDSHIP_TRAINING_SCALING), sourcePerStep: perTraining, sourceStep: cap }];
+    }
+    case 107: {
+      if (values.length >= 4 && amount(1) > 0 && amount(2) > 0 && amount(3) > 0) return [make(targetId, amount(2), uniqueNarrative || ('Scales from ' + amount(3) + ' to ' + amount(2) + ' as energy approaches ' + amount(1) + ' or lower (Set to 0 above 100 energy)'), UNIQUE_EFFECT_MECHANICS.ENERGY_THRESHOLD_SCALING)];
+      return [{ ...make(1, 0, uniqueNarrative || 'Energy-dependent Friendship Bonus formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
+    }
+    case 108: {
+      const start = Number(uniqueNarrative.match(/Gain Training Effectiveness\s*\(([\d.]+)%?\)/i)?.[1]);
+      const increment = Number(uniqueNarrative.match(/additional\s+([\d.]+)%?.*?every\s+([\d.]+)\s+points? of max(?:imum)? Energy/i)?.[1]);
+      const stepSize = Number(uniqueNarrative.match(/additional\s+[\d.]+%?.*?every\s+([\d.]+)\s+points? of max(?:imum)? Energy/i)?.[1]);
+      const cap = Number(uniqueNarrative.match(/up to\s*\(([\d.]+)%?\)/i)?.[1]);
+      if (![start, increment, stepSize, cap].every(Number.isFinite) || stepSize <= 0) {
+        if (values.length >= 4 && amount(2) > 0 && amount(3) > 0) return [make(targetId, amount(3), 'Scales from ' + amount(2) + ' to ' + amount(3) + ' as max energy approaches 120', UNIQUE_EFFECT_MECHANICS.MAX_ENERGY_SCALING)];
+        return [{ ...make(8, 0, uniqueNarrative || 'Maximum-energy scaling formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
+      }
+      return [{ ...make(8, cap, uniqueNarrative, UNIQUE_EFFECT_MECHANICS.MAX_ENERGY_SCALING), sourceStep: stepSize, sourcePerStep: increment, sourceStartValue: start }];
+    }
     case 109: {
       // Total-support-bond scaling. Some Global catalog rows only preserve
       // `Effect #109: 8` (target effect = Training Effectiveness) and omit all
@@ -219,10 +253,7 @@ function normalizeRawUniqueEffect(effect, uniqueMetadata = {}) {
       // interval is also absent, use the documented global rule (+1 per 30,
       // capped at +20 with 600 total bond), never a SupportId-specific patch.
       if (!(bondStep > 0 && increment > 0) && targetId === 8) {
-        bondStep = 30;
-        increment = 1;
-        totalBondCap = 600;
-        explicitEffectCap = 20;
+        bondStep = 30; increment = 1; totalBondCap = 600; explicitEffectCap = 20;
       }
 
       const resolvedCap = explicitEffectCap || (bondStep > 0 && increment > 0 ? Math.floor(totalBondCap / bondStep) * increment : 0);
@@ -234,8 +265,11 @@ function normalizeRawUniqueEffect(effect, uniqueMetadata = {}) {
       // read. It remains visible as unsupported instead of contributing zero.
       return [{ ...make(targetId || 8, 0, 'Total-support-bond scaling parameters are missing from both effect values and Unique Effect description', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
     }
-    case 110:
-      return [make(targetId, step * 5, `Gains ${step} for every other support card on the same training`)];
+    case 110: {
+      const perSupport = Number(uniqueNarrative.match(/Training Effectiveness\s*\(([\d.]+)\)\s+for every support card/i)?.[1]) || step;
+      if (!perSupport) return [{ ...make(targetId || 8, 0, uniqueNarrative || 'Same-training support scaling formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
+      return [{ ...make(8, perSupport * 5, uniqueNarrative || 'Training Effectiveness increases by 5 for every other support card on the same training', UNIQUE_EFFECT_MECHANICS.SAME_TRAINING_SUPPORT_COUNT), sourcePerStep: perSupport }];
+    }
     case 111: {
       // The Global support_hints export currently omits the increment parameter
       // for this mechanic and sends only the target effect (8 = Training
@@ -243,20 +277,29 @@ function normalizeRawUniqueEffect(effect, uniqueMetadata = {}) {
       // increment as +5 Training Effectiveness per facility level. Use that
       // mechanic-level fallback only for target 8; do not guess parameters for
       // other target effects when they are absent from the source record.
-      const perLevel = step > 0 ? step : (targetId === 8 ? 5 : 0);
+      const describedPerLevel = Number(uniqueNarrative.match(/Training Effectiveness\s*\(([\d.]+)\)\s+per every level/i)?.[1]) || 0;
+      const perLevel = step > 0 ? step : (describedPerLevel || (targetId === 8 ? 5 : 0));
       if (perLevel <= 0) return [{ ...make(targetId || 8, 0, 'Per-facility-level effect parameter is missing from the catalog record'), mechanic: 'unsupported-dynamic' }];
-      return [make(targetId, perLevel * 5, `Gains ${perLevel} for every level of the current training facility`, 'per-facility-level')];
+      return [{ ...make(targetId, perLevel * 5, `Gains ${perLevel} for every level of the current training facility`, 'per-facility-level'), sourcePerStep: perLevel }];
     }
     case 112:
-      return [{ id: 112, sourceTypeId: id, sourceTargetTypeId: 112, sourceValues: values, name: 'Unique: Chance to Set Failure Rate to 0%', symbol: 'none', value: rawValue, description: originalDescription, mechanic: 'failure-rate-zero-chance' }];
+      return [{ id: 112, sourceTypeId: id, sourceTargetTypeId: 112, sourceValues: values, name: 'Unique: Chance to Set Failure Rate to 0%', symbol: 'none', value: rawValue, description: uniqueNarrative || originalDescription, mechanic: UNIQUE_EFFECT_MECHANICS.FAILURE_RATE_ZERO_CHANCE }];
     case 113:
-      return [make(targetId, step, 'When participating in Friendship training')];
+      return step > 0 ? [make(targetId, step, uniqueNarrative || 'When participating in Friendship training')] : [{ ...make(targetId || 1, 0, uniqueNarrative || 'Friendship-training unique formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
     case 114: {
-      const cap = amount(1);
-      return [make(targetId, cap, `Increases by 1 for every ${step} energy, up to ${step * cap} energy`)];
+      const match = uniqueNarrative.match(/scales with current Energy, from\s*\(([\d.]+)%?\) at 0 Energy to\s*\(([\d.]+)%?\) at\s*([\d.]+)\+? Energy/i);
+      if (!match) {
+        if (values.length >= 2 && step > 0 && amount(1) > 0) return [make(targetId, amount(1), 'Increases by 1 for every ' + step + ' energy, up to ' + (step * amount(1)) + ' energy', UNIQUE_EFFECT_MECHANICS.ENERGY_AMOUNT_SCALING)];
+        return [{ ...make(8, 0, uniqueNarrative || 'Current-energy scaling formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
+      }
+      return [{ ...make(8, Number(match[2]), uniqueNarrative, UNIQUE_EFFECT_MECHANICS.CURRENT_ENERGY_SCALING), sourceStartValue: Number(match[1]), sourceStep: Number(match[3]) }];
     }
-    case 115:
-      return [make(targetId, step, 'Applies to every support card in the deck')];
+    case 115: {
+      const term = describedBonuses.find((item) => item.label === 'Initial Friendship Gauge');
+      if (term) return [make(14, term.value, uniqueNarrative, UNIQUE_EFFECT_MECHANICS.APPLIES_TO_EVERY_DECK_SUPPORT)];
+      if (step > 0) return [make(targetId || 14, step, uniqueNarrative || 'Applies to every support card in the deck', UNIQUE_EFFECT_MECHANICS.APPLIES_TO_EVERY_DECK_SUPPORT)];
+      return [{ ...make(targetId || 14, 0, uniqueNarrative || 'Deck-wide unique formula missing from source', 'unsupported-dynamic'), mechanic: 'unsupported-dynamic' }];
+    }
     case 116: {
       const skills = { 1: 'Speed', 2: 'Acceleration', 3: 'Recovery' };
       const category = skills[rawValue] || `Category ${rawValue}`;
@@ -308,25 +351,32 @@ const BASE_TABLES = Object.fromEntries((scenarioConfig.scenarios || []).map((sce
 
 export function normalizeGlobalSupportCards(payload) {
   if (!Array.isArray(payload)) return [];
-  return payload.filter((row) => row && String(row.SupportServer || '').toLowerCase() === 'global').map((row) => ({
-    id: String(row.SupportId || ''),
-    slug: String(row.SupportSlug || ''),
-    name: String(row.SupportName || ''),
-    rarity: String(row.SupportRarity || '').toUpperCase(),
-    type: String(row.SupportType || 'Support'),
-    imageUrl: row.SupportImage ? `https://beta.daftuyda.moe${String(row.SupportImage).startsWith('/') ? '' : '/'}${row.SupportImage}` : '',
-    effects: Array.isArray(row.SupportEffects) ? row.SupportEffects.map((effect) => ({
-      id: Number(effect?.id), name: String(effect?.name || ''), symbol: String(effect?.symbol || 'none'),
-      values: Array.isArray(effect?.values) ? effect.values.map((value) => Number(value) || 0) : [],
-      description: firstText(effect?.description, effect?.desc, effect?.text, effect?.detail),
-      mechanic: firstText(effect?.mechanic, effect?.mechanicId, effect?.formula, effect?.effectType),
-    })).filter((effect) => effect.name) : [],
-    unique: row.SupportUnique && typeof row.SupportUnique === 'object' ? {
-      level: Number(row.SupportUnique.level) || 0,
-      description: firstText(row.SupportUnique.description, row.SupportUnique.desc, row.SupportUnique.text, row.SupportUnique.detail),
-      effects: Array.isArray(row.SupportUnique.effects) ? row.SupportUnique.effects.flatMap((effect) => normalizeRawUniqueEffect(effect, row.SupportUnique)).filter((effect) => effect.name) : [],
-    } : null,
-  })).filter((card) => /^\d{4,8}$/.test(card.id) && card.name).sort((a, b) => a.name.localeCompare(b.name, 'en'));
+  return payload.filter((row) => row && String(row.SupportServer || '').toLowerCase() === 'global').map((row) => {
+    const id = String(row.SupportId || '');
+    const sourceCandidate = SUPPORT_CARD_UNIQUE_SOURCE.cards?.[id];
+    const sourceUnique = sourceCandidate?.name === String(row.SupportName || '') ? sourceCandidate : null;
+    const rawUnique = row.SupportUnique && typeof row.SupportUnique === 'object' ? row.SupportUnique : null;
+    const uniqueDescription = firstText(rawUnique?.description, rawUnique?.desc, rawUnique?.text, rawUnique?.detail, sourceUnique?.uniqueDescription);
+    const unique = rawUnique ? {
+      level: Number(rawUnique.level) || 0, description: uniqueDescription,
+      effects: Array.isArray(rawUnique.effects) ? rawUnique.effects.flatMap((effect) => normalizeRawUniqueEffect(effect, { ...rawUnique, description: uniqueDescription })).filter((effect) => effect.name) : [],
+    } : (id === '30080' && sourceUnique ? {
+      level: 30, description: uniqueDescription,
+      effects: [{ id: 9991, name: 'Unique: Event Appearance Rate', symbol: 'none', value: 0, description: uniqueDescription, mechanic: UNIQUE_EFFECT_MECHANICS.UNSUPPORTED_DYNAMIC }],
+    } : null);
+    return {
+      id, slug: String(row.SupportSlug || ''), name: String(row.SupportName || ''),
+      rarity: String(row.SupportRarity || '').toUpperCase(), type: String(row.SupportType || 'Support'),
+      imageUrl: row.SupportImage ? 'https://beta.daftuyda.moe' + (String(row.SupportImage).startsWith('/') ? '' : '/') + row.SupportImage : '',
+      effects: Array.isArray(row.SupportEffects) ? row.SupportEffects.map((effect) => ({
+        id: Number(effect?.id), name: String(effect?.name || ''), symbol: String(effect?.symbol || 'none'),
+        values: Array.isArray(effect?.values) ? effect.values.map((value) => Number(value) || 0) : [],
+        description: firstText(effect?.description, effect?.desc, effect?.text, effect?.detail),
+        mechanic: firstText(effect?.mechanic, effect?.mechanicId, effect?.formula, effect?.effectType),
+      })).filter((effect) => effect.name) : [],
+      unique,
+    };
+  }).filter((card) => /^\d{4,8}$/.test(card.id) && card.name).sort((a, b) => a.name.localeCompare(b.name, 'en'));
 }
 
 export async function loadSupportCardCatalog({ force = false } = {}) {
@@ -458,6 +508,8 @@ function unlockedUniqueEffectsForLimitBreak(card, lb) {
       mechanic: String(effect?.mechanic || ''),
       sourceStep: Number(effect?.sourceStep) || 0,
       sourcePerStep: Number(effect?.sourcePerStep) || 0,
+      sourceStartValue: Number(effect?.sourceStartValue) || 0,
+      sourceEnergyCap: Number(effect?.sourceEnergyCap) || 0,
       sourceTotalBondCap: Number(effect?.sourceTotalBondCap) || 0,
     };
     const mechanicContext = {
@@ -498,6 +550,7 @@ export const UNIQUE_EFFECT_MECHANICS = Object.freeze({
   TOTAL_FACILITY_LEVEL_SCALING: 'total-facility-level-scaling',
   ENERGY_THRESHOLD_SCALING: 'energy-threshold-scaling',
   MAX_ENERGY_SCALING: 'max-energy-scaling',
+  CURRENT_ENERGY_SCALING: 'current-energy-scaling',
   APPLIES_TO_EVERY_DECK_SUPPORT: 'applies-to-every-deck-support',
   NEXT_TURN_SUPPORT_EFFECT: 'next-turn-support-effect',
 });
@@ -603,7 +656,7 @@ function parseBondThreshold(details) {
 }
 
 function getUniqueEffectCondition(effect, context = {}) {
-  const details = mechanicText(effect, context);
+  const details = mechanicText(effect, context).replace(/\bwhen training together\b/ig, '').replace(/\bwhen beginning a career playthrough\b/ig, '');
   if (!details) return '';
   // Total-bond scaling is itself the condition/formula. Phrases such as
   // "Training Effectiveness based on total Friendship of cards in deck" must
@@ -625,9 +678,10 @@ function getUniqueEffectCondition(effect, context = {}) {
   // (raw type 106) with a bonus that only activates on the current rainbow
   // training (raw type 113).
   const isPastFriendshipTrainingScaling = /(?:for every|per) friendship training/i.test(details);
-  const hasRainbowCondition = !isPastFriendshipTrainingScaling && /rainbow training|friendship training is active|when (?:participating in )?friendship training|during friendship training/i.test(details);
+  const hasRainbowCondition = !isPastFriendshipTrainingScaling && /rainbow training|friendship training is active|when (?:participating in )?friendship training|when participating in a friendship\s*\(rainbow\)\s*training|during friendship training/i.test(details);
   const nonSpecialtyCondition = /not\s+(?:training|on)\s+(?:in\s+)?(?:its\s+)?(?:preferred|specialty|speciality)\s+(?:training|facility)?/i.test(details)
-    || /not training in specialty/i.test(details);
+    || /not training in specialty/i.test(details)
+    || /facility different from (?:this card's|its|the card's) type/i.test(details);
   const deckTypeMatch = details.match(/(?:at least|minimum of)\s+(\d+)\s+different types? of support cards?/i);
   const facilityMatch = details.match(/(?:when|while|during|on|in|if|for)\s+(?:the\s+)?(?:a\s+)?(speed|stamina|power|guts|wit|wisdom)\s+(?:training|facility)\b/i)
     || details.match(/(?:training|facility)\s+(?:of|on|for|in)\s+(speed|stamina|power|guts|wit|wisdom)\b/i);
@@ -654,14 +708,14 @@ const UNIQUE_EFFECT_RULES = [
     resolveValue(effect, context) {
       const level = Math.max(1, Math.min(5, Number(context?.facilityLevel) || 1));
       const details = mechanicText(effect, context);
-      const step = getTextStep(details, /(?:gains?|increases? by)\s*([\d.]+)\s*(?:%\s*)?for every level of the current training facility/i);
+      const step = Number(effect?.sourcePerStep) || getTextStep(details, /(?:gains?|increases? by)\s*([\d.]+)\s*(?:%\s*)?for every level of the current training facility/i);
       if (step !== null) return Number(effect.value) === step ? step * level : Math.min(Number(effect.value), step * level);
       return Number(effect.value) * level;
     },
     describe(effect, context) {
       const level = Math.max(1, Math.min(5, Number(context?.facilityLevel) || 1));
       const details = mechanicText(effect, context);
-      const step = getTextStep(details, /(?:gains?|increases? by)\s*([\d.]+)\s*(?:%\s*)?for every level of the current training facility/i);
+      const step = Number(effect?.sourcePerStep) || getTextStep(details, /(?:gains?|increases? by)\s*([\d.]+)\s*(?:%\s*)?for every level of the current training facility/i);
       const perLevel = step === null ? Number(effect.value) : step;
       const resolved = step === null ? Number(effect.value) * level : (Number(effect.value) === step ? step * level : Math.min(Number(effect.value), step * level));
       return `+${resolved}${effect.symbol === 'percent' ? '%' : ''} @ Lv ${level} (${perLevel}${effect.symbol === 'percent' ? '%' : ''}/Lv facility)`;
@@ -687,7 +741,7 @@ function getUniqueEffectMechanic(effect, context = {}) {
   if (/applies to every support card in the deck/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.APPLIES_TO_EVERY_DECK_SUPPORT;
   if (/scales? from [\d.]+ to [\d.]+ as energy approaches/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.ENERGY_THRESHOLD_SCALING;
   if (/scales? from [\d.]+ to [\d.]+ as max energy approaches/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.MAX_ENERGY_SCALING;
-  if (/scal(?:e|es|ing) every [\d,]+ fans?|every [\d,]+ fans?.{0,35}up to/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.FAN_SCALING;
+  if (/(?:scal(?:e|es|ing)\s+)?(?:every|per)\s+[\d,]+\s+fans?(?:.{0,45}up to)?/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.FAN_SCALING;
   if (/every friendship training|per friendship training/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.FRIENDSHIP_TRAINING_SCALING;
   if (/every [\d,]+\s+(?:(?:combined|total)\s+)?(?:support\s+)?bond|total bond.{0,30}every/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.TOTAL_BOND_SCALING;
   if (/every [\d,]+ energy|per [\d,]+ energy/i.test(detailsForDynamic)) return UNIQUE_EFFECT_MECHANICS.ENERGY_AMOUNT_SCALING;
@@ -724,7 +778,8 @@ function getUniqueEffectMechanic(effect, context = {}) {
     .replace(/\b(?:bond|friendship)(?:\s+gauge)?\s*(?:is\s+|at\s+)?\d{1,3}(?:\s*\/\s*100)?\s*(?:\+|or higher|or more|and above|or greater)/ig, '')
     .replace(/(?:rainbow|friendship)\s+training/ig, '')
     .replace(/(?:when|while|during|on|in|if|for)\s+(?:the\s+)?(?:a\s+)?(speed|stamina|power|guts|wit|wisdom)\s+(?:training|facility)/ig, '');
-  const hasUnmodelledDynamicLanguage = /\b(?:per\s+(?:every|each|level|turn|training)|for\s+each|depending\s+on|based\s+on|scales?\s+with|increases?\s+with|current\s+training\s+facility|if\s+the|when\s+the|while\s+the|unless)\b/i.test(detailsWithoutKnownConditions);
+  const dynamicCheckText = detailsWithoutKnownConditions.replace(/\bwhen the\b/ig, '').replace(/\bwhen participating in\b/ig, '');
+  const hasUnmodelledDynamicLanguage = /\b(?:per\s+(?:every|each|level|turn|training)|for\s+each|depending\s+on|based\s+on|scales?\s+with|increases?\s+with|current\s+training\s+facility|if\s+the|when\s+the|while\s+the|unless)\b/i.test(dynamicCheckText);
   if (hasUnmodelledDynamicLanguage || condition === UNIQUE_EFFECT_CONDITIONS.UNSUPPORTED) return UNIQUE_EFFECT_MECHANICS.UNSUPPORTED_DYNAMIC;
   return '';
 }
@@ -772,22 +827,21 @@ function resolveUniqueEffectValue(effect, context = {}) {
   const maximum = Math.max(0, Number(effect?.value) || 0);
   if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.DECK_PARAMETER_BONUS || effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.DECK_STARTING_STATS) return 0;
   if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.SAME_TRAINING_SUPPORT_COUNT) {
-    const step = getTextStep(details, /(?:gains?|increases? by)\s*([\d.]+)\s*(?:%\s*)?for every other support card/i);
+    const step = Number(effect?.sourcePerStep) || getTextStep(details, /training effectiveness\s*\(([\d.]+)\)\s+for every support card in the same training/i) || getTextStep(details, /(?:gains?|increases? by)\s*([\d.]+)\s*(?:%\s*)?for every other support card/i);
     return step === null ? 0 : Math.min(maximum, step * Math.max(0, (Number(context?.supportCardsAtTraining) || 1) - 1));
   }
   if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.FAN_SCALING) {
-    const step = getTextStep(details, /every\s+([\d,]+)\s+fans?/i);
+    const step = getTextStep(details, /(?:every|per)\s+([\d,]+)\s+fans?/i);
     const describedFanCap = getTextStep(details, /up to\s+([\d,]+)\s+fans?/i);
     const assumedFans = describedFanCap ?? (step && step > 0 ? step * maximum : 0);
     const fans = context?.fans === undefined || context?.fans === null ? assumedFans : Math.max(0, Number(context.fans) || 0);
     return step && step > 0 ? Math.min(maximum, Math.floor(fans / step)) : 0;
   }
   if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.FRIENDSHIP_TRAINING_SCALING) {
-    const step = getTextStep(details, /increases? by\s*([\d.]+)\s*(?:%\s*)?for every friendship training/i) ?? 1;
-    const cap = getTextStep(details, /up to\s+([\d,]+)\s+times?/i) ?? Math.max(0, Math.floor(maximum / step));
-    const count = context?.friendshipTrainingCount === undefined || context?.friendshipTrainingCount === null
-      ? cap : Math.max(0, Number(context.friendshipTrainingCount) || 0);
-    return Math.min(maximum, count, cap) * step;
+    const step = Number(effect?.sourcePerStep) || getTextStep(details, /friendship bonus\s*\(([\d.]+)\)\s+every time/i) || getTextStep(details, /increases? by\s*([\d.]+)\s*(?:%\s*)?for every friendship training/i) || 1;
+    const cap = Number(effect?.sourceStep) || getTextStep(details, /up to\s+([\d,]+)\s+times?/i) || Math.max(0, Math.floor(maximum / step));
+    const count = context?.friendshipTrainingCount === undefined || context?.friendshipTrainingCount === null ? cap : Math.max(0, Number(context.friendshipTrainingCount) || 0);
+    return Math.min(maximum, Math.min(count, cap) * step);
   }
   if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.TOTAL_BOND_SCALING) {
     const step = Number(effect?.sourceStep) || getTextStep(details, /every\s+([\d,]+)\s+(?:(?:combined|total)\s+)?(?:support\s+)?bond/i);
@@ -826,12 +880,22 @@ function resolveUniqueEffectValue(effect, context = {}) {
     return highEffect + (lowEffect - highEffect) * ((100 - energy) / (100 - lowEnergy));
   }
   if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.MAX_ENERGY_SCALING) {
+    const step = Number(effect?.sourceStep) || getTextStep(details, /additional\s+[\d.]+%?.*?every\s+([\d.]+)\s+points? of max(?:imum)? energy/i);
+    const increment = Number(effect?.sourcePerStep) || getTextStep(details, /additional\s+([\d.]+)%?.*?every/i);
+    const start = Number(effect?.sourceStartValue) || getTextStep(details, /gain training effectiveness\s*\(([\d.]+)%?\)/i);
     const match = details.match(/scales? from\s*([\d.]+)\s*to\s*([\d.]+)\s*as max energy approaches\s*120/i);
+    if (step && increment && start !== null) {
+      const energy = Math.max(100, Math.min(120, Number(context?.maxEnergy) || 120));
+      return Math.min(maximum, start + Math.floor((energy - 100) / step) * increment);
+    }
     if (!match) return 0;
-    const lowEffect = Number(match[1]);
-    const highEffect = Number(match[2]);
     const energy = Math.max(100, Math.min(120, Number(context?.maxEnergy) || 120));
-    return lowEffect + (highEffect - lowEffect) * ((energy - 100) / 20);
+    return Number(match[1]) + (Number(match[2]) - Number(match[1])) * ((energy - 100) / 20);
+  }
+  if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.CURRENT_ENERGY_SCALING) {
+    const start = Number(effect?.sourceStartValue) || 0; const capAt = Number(effect?.sourceStep) || 100;
+    const energy = Math.max(0, Number(context?.currentEnergy ?? context?.maxEnergy ?? 120));
+    return Math.min(maximum, start + (maximum - start) * Math.min(1, energy / capAt));
   }
   if (effect?.mechanicRule === UNIQUE_EFFECT_MECHANICS.APPLIES_TO_EVERY_DECK_SUPPORT) {
     // Type 115 applies this bonus independently to each member of the deck.
@@ -894,7 +958,8 @@ export function getDeckStartingStatsBonuses(card, lb, deckComposition = {}) {
   if (!effects.length || !isCompleteOtherDeck(deckComposition)) return bonuses;
   const counts = getDeckCounts(deckComposition, card?.type);
   const friendGroupPerStat = effects.reduce((max, effect) => {
-    const match = mechanicText(effect, { uniqueDescription: card?.unique?.description, uniqueEffects: card?.unique?.effects }).match(/friend and group cards are worth\s*([\d.]+)/i);
+    const text = mechanicText(effect, { uniqueDescription: card?.unique?.description, uniqueEffects: card?.unique?.effects });
+    const match = text.match(/friend and group (?:types )?give\s*\(?([\d.]+)/i) || text.match(/friend and group cards are worth\s*([\d.]+)/i);
     return Math.max(max, match ? Number(match[1]) : 0);
   }, 0);
   for (const effect of effects) {
