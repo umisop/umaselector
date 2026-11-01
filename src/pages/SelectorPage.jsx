@@ -155,6 +155,8 @@ function RedeemPlanner({
 }) {
   const [activeSkill, setActiveSkill] = useState(null);
   const closeSkillModal = useCallback(() => setActiveSkill(null), []);
+  const totalTickets = Object.values(ticketCounts || {}).reduce((total, count) => total + Math.max(0, Number(count) || 0), 0);
+  const showAddButton = totalTickets >= 2;
 
   return (
     <section className="redeem-planner" aria-label="Interactive redeem planner">
@@ -294,15 +296,15 @@ function RedeemPlanner({
                   {!levelKnown && <p className="redeem-unavailable-hint">Choose the current LB to calculate a safe exchange limit.</p>}
                   {levelKnown && currentLevel < 4 && !compatiblePool && <p className="redeem-unavailable-hint">No unused compatible ticket remains. Add a ticket or remove a planned exchange.</p>}
                 </div>
-                <button
+                {showAddButton && <button
                   type="button"
                   className="redeem-action-button"
                   onClick={() => onRedeem(candidate)}
                   disabled={!levelKnown || currentLevel >= 4 || !compatiblePool}
                   title={disabledReason || `Use one ${compatiblePool?.label} ticket`}
                 >
-                  <Plus size={15} /> Redeem
-                </button>
+                  <Plus size={15} /> Add
+                </button>}
               </article>
             );
           })}
