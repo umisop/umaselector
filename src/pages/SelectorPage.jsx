@@ -34,8 +34,8 @@ import {
 const CORE_ORDER = ["kitasan-black", "super-creek", "fine-motion", "agnes-tachyon", "maruzensky", "mr-cb"];
 
 // Replace this ID with your own YouTube video ID when your video is ready.
-const FEATURED_VIDEO_ID = "kBsB3_luYHk";
-const FEATURED_VIDEO_START_SECONDS = 10;
+const FEATURED_VIDEO_ID = "y54rzhpOFS4";
+const FEATURED_VIDEO_START_SECONDS = 0;
 
 function sortCoreCards(cards) {
   const order = new Map(CORE_ORDER.map((id, index) => [id, index]));
